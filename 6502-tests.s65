@@ -1,0 +1,663 @@
+; 
+
+;-------------------------------------------------------------------------
+
+                .include "./submodules/beeb/include/beeb.s65"
+                
+;-------------------------------------------------------------------------
+
+State: .struct
+a:
+                .fill 1
+x:
+                .fill 1
+y:
+                .fill 1
+s:
+                .fill 1
+p:
+                .fill 1
+                .endstruct
+
+Test: .macro exec,simulate,next,name
+                .word \exec
+                .word \simulate
+                .word \next
+                .shiftl \name
+                .endmacro
+                
+;-------------------------------------------------------------------------
+
+P: .block
+N=$80
+V=$40
+U=$20
+B=$10
+D=$08
+I=$04
+Z=$02
+C=$01
+                .endblock
+
+simulate_p: .macro mask
+                php
+                lda input_state.p
+                and #(\mask)^$ff
+                sta simulated_state.p
+                pla
+                and #\mask
+                ora simulated_state.p
+                sta simulated_state.p
+                .endmacro
+
+simulate_s: .macro
+                lda input_state.s
+                sta simulated_state.s
+                .endmacro
+                
+simulate_y: .macro
+                lda input_state.y
+                sta simulated_state.y
+                .endmacro
+                
+simulate_x: .macro
+                lda input_state.x
+                sta simulated_state.x
+                .endmacro
+
+simulate_a: .macro
+                lda input_state.a
+                sta simulated_state.a
+                .endmacro
+                
+;-------------------------------------------------------------------------
+
+*=0
+                .dsection zp_bss
+                .cerror *>$90,'zp overflow'
+
+                ; start high to accommodate *SPOOL + ADFS
+*=$2000
+                .dsection code
+                .cerror *>$7c00,'code overflow'
+                
+;-------------------------------------------------------------------------
+
+                .section zp_bss
+input_state: .dstruct State
+output_state: .dstruct State
+simulated_state: .dstruct State
+operand:
+                .fill 1
+operand_ptr:
+                .fill 2
+print_ptr:
+                .fill 2
+old_language_rom:
+                .fill 1
+test_ptr:
+                .fill 2
+any_bad:
+                .fill 1
+exec_routine:
+                .fill 2
+                .endsection zp_bss
+
+;-------------------------------------------------------------------------
+
+                .section code
+
+                sta $fffe
+                
+                .cpu '65c02'
+                ldx #$ff
+                phx             ;1-byte NOP on NMOS
+                inx
+                plx             ;1-byte NOP on NMOS
+                beq +
+                brk
+                .text 255,'Requires NMOS 6502',0
++
+                .cpu 'default'
+
+                lda #252        ;current language ROM (AUG p243)
+                jsr osbyte_x00_yff
+                stx old_language_rom
+
+                lda #<tests
+                sta test_ptr+0
+                lda #>tests
+                sta test_ptr+1
+
+run_instruction_test_loop:
+                ldy #0
+                lda (test_ptr),y
+                iny
+                ora (test_ptr),y
+                beq all_tests_done
+
+                ldy #0
+
+                ; fix up exec routine
+                lda (test_ptr),y
+                iny
+                sta jmp_exec+1
+                sta exec_routine+0
+                
+                lda (test_ptr),y
+                iny
+                sta jmp_exec+2
+                sta exec_routine+1
+
+                ; fix up simulate routine
+                lda (test_ptr),y
+                iny
+                sta jsr_simulate+1
+                
+                lda (test_ptr),y
+                iny
+                sta jsr_simulate+2
+
+                ; fix up next_state routine
+                lda (test_ptr),y
+                iny
+                sta jmp_next_state+1
+
+                lda (test_ptr),y
+                iny
+                sta jmp_next_state+2
+
+                ; print name
+-
+                lda (test_ptr),y
+                iny
+                lsr a
+                php
+                jsr oswrch
+                plp
+                bcc -
+
+                clc
+                tya
+                adc test_ptr+0
+                sta test_ptr+0
+                bcc +
+                inc test_ptr+1
++
+
+                ; initialise operand_ptr               
+                lda #operand
+                sta operand_ptr+0
+                lda #0
+                sta operand_ptr+1
+
+                ; initialise state
+                lda #0
+                sta input_state.a
+                sta input_state.x
+                sta input_state.y
+                php
+                pla
+                sta input_state.p
+                lda #$ff
+                sta input_state.s
+                lda #0
+                sta operand
+                sta any_bad
+
+test_one_state_loop:
+                ldx input_state.s
+                txs
+                lda input_state.p
+                pha
+                ldy input_state.y
+                ldx input_state.x
+                lda input_state.a
+                plp
+jmp_exec:
+                jmp jmp_exec
+exec_done:
+                php
+                sta output_state.a
+                stx output_state.x
+                sty output_state.y
+                pla
+                sta output_state.p
+                tsx
+                stx output_state.s
+
+                ldx #$ff
+                txs
+
+                cld
+                cli
+
+jsr_simulate:
+                jsr jsr_simulate
+
+                lda simulated_state.a
+                cmp output_state.a
+                bne bad
+
+                lda simulated_state.x
+                cmp output_state.x
+                bne bad
+
+                lda simulated_state.y
+                cmp output_state.y
+                bne bad
+
+                lda simulated_state.p
+                cmp output_state.p
+                bne bad
+
+                lda simulated_state.s
+                cmp output_state.s
+                bne bad
+
+jmp_next_state:
+                jmp jmp_next_state
+
+bad:
+                bit any_bad
+                bmi +
+                jsr osnewl
++
+                lda #$80
+                sta any_bad
+                jsr print_states
+                jmp jmp_next_state
+                ; ...
+
+instruction_test_done:
+                sta $ffff
+
+                bit any_bad
+                bmi +
+
+                jsr print0
+                .text " - ok",10,13,0
++
+
+                jmp run_instruction_test_loop
+
+all_tests_done:                
+                lda #142        ;enter language ROM (AUG p166)
+                ldx old_language_rom
+                jmp osbyte
+
+;-------------------------------------------------------------------------
+
+next_M:
+                clc
+                lda input_state.a
+                adc #11
+                sta input_state.a
+
+                clc
+                lda input_state.x
+                adc #13
+                sta input_state.x
+
+                clc
+                lda input_state.y
+                adc #17
+                sta input_state.y
+
+                clc
+                lda input_state.s
+                adc #19
+                sta input_state.s
+                
+                inc operand
+                bne test_one_state_loop
+                jmp instruction_test_done
+
+next_imm_A:
+                inc input_state.a
+                bne test_one_state_loop
+
+                lda input_state.p
+                eor #1
+                sta input_state.p
+                lsr a
+                bcs test_one_state_loop
+
+                clc
+                lda input_state.x
+                adc #13
+                sta input_state.x
+
+                clc
+                lda input_state.y
+                adc #17
+                sta input_state.y
+
+                clc
+                lda input_state.s
+                adc #19
+                sta input_state.s
+
+                lda operand
+                eor #$ff
+                jsr progress
+
+                inc operand
+                ldy #1
+                lda operand
+                sta (exec_routine),y
+                bne test_one_state_loop
+
+                jmp instruction_test_done
+
+;-------------------------------------------------------------------------
+
+progress:
+                bit $ff
+                bmi all_tests_done
+
+                pha
+                lda #' '
+                jsr oswrch
+                pla
+                jsr print_hex
+                lda #8
+                jsr oswrch
+                jsr oswrch
+                jmp oswrch
+                
+;-------------------------------------------------------------------------
+
+tests:
+                ; .Test exec_lax_zpg,simulate_lax,next_M,"lax $nn"
+                ; .Test exec_lax_zpy,simulate_lax,next_M,"lax $nn,y"
+                ; .Test exec_lax_abs,simulate_lax,next_M,"lax $nnnn"
+                ; .Test exec_lax_aby,simulate_lax,next_M,"lax $nnnn,y"
+                ; .Test exec_lax_inx,simulate_lax,next_M,"lax ($nn,x)"
+                ; .Test exec_lax_iny,simulate_lax,next_M,"lax ($nn),y"
+                ; .Test exec_asr_imm,simulate_asr,next_imm_A,"asr #$nn"
+                .Test exec_anc_imm,simulate_anc,next_imm_A,"anc #$nn"
+                .Test exec_anc2_imm,simulate_anc,next_imm_A,"anc2 #$nn"
+                .word 0
+
+;-------------------------------------------------------------------------
+
+exec_lax_zpg: .block
+                lax operand
+                jmp exec_done
+                .endblock
+
+exec_lax_zpy: .block
+                sty reload_y+1
+                ldy #0
+                lax operand,y
+                php
+reload_y:
+                ldy #$ff
+                plp
+                jmp exec_done
+                .endblock
+
+exec_lax_abs: .block
+                lax @w operand
+                jmp exec_done
+                .endblock
+
+exec_lax_aby: .block
+                sty reload_y+1
+                ldy #0
+                lax @w operand,y
+                php
+reload_y:
+                ldy #$ff
+                plp
+                jmp exec_done
+                .endblock
+
+exec_lax_inx: .block
+                ldx #0
+                lax (operand_ptr,x)
+                jmp exec_done
+                .endblock
+
+exec_lax_iny: .block
+                sty reload_y+1
+                ldy #0
+                lax (operand_ptr),y
+                php
+reload_y: ldy #$ff
+                plp
+                jmp exec_done
+                .endblock
+
+simulate_lax:
+                lda operand
+                sta simulated_state.a
+                sta simulated_state.x
+                .simulate_p P.N|P.Z
+                .simulate_y
+                .simulate_s
+                rts
+
+;-------------------------------------------------------------------------
+
+exec_asr_imm: .block
+                asr #0
+                jmp exec_done
+                .endblock
+
+simulate_asr:
+                lda input_state.a
+                and operand
+                lsr a
+                sta simulated_state.a
+                
+                .simulate_p P.N|P.Z|P.C
+
+                ; lsr simulated_state.a
+
+                ; lda simulated_state.p
+                ; adc #0
+                ; sta simulated_state.p
+
+                .simulate_x
+                .simulate_y
+                .simulate_s
+                rts
+
+;-------------------------------------------------------------------------
+
+exec_anc_imm: .block
+                anc #0
+                jmp exec_done
+                .endblock
+
+exec_anc2_imm: .block
+                .byte $2b,$00
+                jmp exec_done
+                .endblock
+
+simulate_anc:
+                lda input_state.a
+                and operand
+                sta simulated_state.a
+
+                cmp #$80
+                and #$ff
+                .simulate_p P.N|P.Z|P.C
+
+                .simulate_x
+                .simulate_y
+                .simulate_s
+                rts
+
+;-------------------------------------------------------------------------
+
+print_states: .proc
+                lda operand
+                ldy #'M'
+                jsr reg
+
+                jsr print0
+                .text ': I:'
+                .byte 0
+                
+                ldx #input_state
+                jsr print_state
+
+                jsr print0
+                .text '       R:'
+                .byte 0
+
+                ldx #output_state
+                jsr print_state
+
+                jsr print0
+                .text '       S:'
+                .byte 0
+
+                ldx #simulated_state
+                jsr print_state
+
+                rts
+
+print_state:
+                lda State.a,x
+                ldy #'A'
+                jsr reg
+
+                lda State.x,x
+                ldy #'X'
+                jsr reg
+
+                lda State.y,x
+                ldy #'Y'
+                jsr reg
+
+                lda State.s,x
+                ldy #'S'
+                jsr reg
+
+                lda #' '
+                jsr oswrch
+
+                lda State.p,x
+                ldy #7
+-
+                asl a
+                pha
+                lda p_bits,y
+                bcs +
+                ora #$20
++
+                jsr oswrch
+                pla
+                dey
+                bne -
+
+                jsr osnewl
+
+                bit $ff
+                bmi all_tests_done
+
+                rts
+
+reg:
+                pha
+                lda #' '
+                jsr oswrch
+                tya
+                jsr oswrch
+                lda #'='
+                jsr oswrch
+                pla
+                jmp print_hex
+                
+
+p_bits: .text 'CZIDBUVN'
+                .endproc
+                
+;-------------------------------------------------------------------------
+
+print0: .proc
+                pla
+                sta print_ptr+0
+                pla
+                sta print_ptr+1
+
+loop:
+                ldx #print_ptr
+                jsr incz16
+                
+                lda #218        ;items in VDU queue (AUG p221)
+                jsr osbyte_x00_yff
+                
+                ldy #0
+                lda (print_ptr),y
+
+                cpx #0
+                bne print
+
+                cmp #0
+                beq done
+
+print:
+                jsr oswrch
+
+                
+                jmp loop
+
+done:
+                ldx #print_ptr
+                jsr incz16
+                jmp (print_ptr)
+                
+                .endproc   
+
+;-------------------------------------------------------------------------
+
+incz16:
+                inc 0,x
+                bne +
+                inc 1,x
++
+                rts
+                
+;-------------------------------------------------------------------------
+
+osbyte_x00_yff:
+                ldx #$00
+                ldy #$ff
+                jmp osbyte
+                
+;-------------------------------------------------------------------------
+
+get_hi_nybble_ascii:
+                lsr a
+                lsr a
+                lsr a
+                lsr a
+get_lo_nybble_ascii:
+                and #$0f
+                sed
+                clc
+                adc #$90
+                adc #$40
+                cld
+                rts
+
+print_hex:
+                pha
+                pha
+                jsr get_hi_nybble_ascii
+                jsr oswrch
+                pla
+                jsr get_lo_nybble_ascii
+                jsr oswrch
+                pla
+                rts
+                
+;-------------------------------------------------------------------------
+                
+                .endsection code
+                

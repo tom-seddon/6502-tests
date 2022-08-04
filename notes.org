@@ -1,0 +1,62 @@
+https://www.masswerk.at/nowgobang/2021/6502-illegal-opcodes
+
+Based on the ADC/SBC tests, at 2 MHz, using BeebLink, should take
+~10-15 seconds to collate all outputs for 16 bits of input.
+
+For each test, should save out all registers: A X Y P S
+
+So for 16 bits of input, that's 320 KBytes, and you'll need ADFS or
+BeebLink.
+
+For 17 bits of input, need to be able to run each half (C=0 vs C=1)
+separately.
+
+For 24 bits of input, sorry, you just need a lot of disk space (and
+about 45 minutes).
+
+8 bits of input:
+
+| Name | 64tass  | inputs     | outputs    | notes    |
+|------+---------+------------+------------+----------|
+| LAX  | LAX     | M          | A, X, P    |          |
+
+16 bits of input:
+
+| Name | 64tass  | inputs     | outputs    | notes    |
+|------+---------+------------+------------+----------|
+| ALR  | ASR     | A, imm     | A, P       |          |
+| ANC  | ANC     | A, imm     | A, P       |          |
+| ANC  | - ($2b) | A, imm     | A, P       |          |
+| DCP  | DCP     | A, M       | M, P       |          |
+| ISC  | ISB     | A, M       | M, P       |          |
+| LAS  | LDS     | M, S       | A, X, S, P |          |
+| SLO  | SLO     | M, A       | A, M, P    |          |
+| SRE  | SRE     | M, A       | A, M, P    |          |
+| USBC | - ($eb) |            |            |          |
+
+17 bits of input:
+
+| Name | 64tass  | inputs     | outputs    | notes    |
+|------+---------+------------+------------+----------|
+| ARR  | ARR     | A, imm, C  | A, P       |          |
+| RLA  | RLA     | M, C, A    | A, M, P    |          |
+| RRA  | RRA     | M, C, A    | A, M, P    |          |
+
+24 bits of input:
+
+| Name | 64tass  | inputs     | outputs    | notes    |
+|------+---------+------------+------------+----------|
+| SBX  | SBX     | A, X, oper | X, P       |          |
+
+Unstable (ignore for now):
+
+| Name | 64tass  | inputs     | outputs    | notes    |
+|------+---------+------------+------------+----------|
+| LXA  | LAX #   | imm        | A, X, P    | unstable |
+| SHA  |         |            |            | unstable |
+| SHX  |         |            |            | unstable |
+| SHY  |         |            |            | unstable |
+| ANE  | ANE     | A, X, imm  | A, P       | unstable |
+| TAS  |         |            |            | unstable |
+
+Ignore the unstable ones for now.
