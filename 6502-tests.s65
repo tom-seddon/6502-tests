@@ -164,6 +164,9 @@ index_type: .fill 1
                 ; Inhibited when *SPOOLing.
 show_progress: .fill 1
 
+                ; working data for BCD arithmetic
+bcd_ah: .fill 1
+bcd_al: .fill 1
                 .endsection zp_bss
 
 ;-------------------------------------------------------------------------
@@ -562,6 +565,14 @@ done:
 ;-------------------------------------------------------------------------
 
 tests:
+                .if should_run_test('adc_bcd_nmos')
+                .Test exec_adc_bcd_zpg,Index.none,simulate_adc_bcd_nmos,cycle_operand_A_C,"adc $nn (BCD) (NMOS)"
+                .endif
+
+                .if should_run_test('sbc_bcd_nmos')
+                .Test exec_sbc_bcd_zpg,Index.none,simulate_sbc_bcd_nmos,cycle_operand_A_C,"sbc $nn (BCD) (NMOS)"
+                .endif
+                
                 .if should_run_test('arr')
                 .Test exec_arr_imm,Index.none,simulate_arr,cycle_imm_A_C_D,"arr #$nn"
                 .endif
@@ -1233,6 +1244,233 @@ simulate_rra: .proc
                 .simulate_y
                 .simulate_s
                 rts
+                .endproc
+
+;-------------------------------------------------------------------------
+
+exec_adc_bcd_zpg: .proc
+                sed
+                adc input_state.operand
+                cld
+                jmp exec_done
+                .endproc
+
+simulate_adc_bcd_nmos: .proc
+ah=bcd_ah
+al=bcd_al
+                
+                lda input_state.p
+                and #~(P.N|P.V|P.Z|P.C)
+                sta simulated_state.p
+
+                lda #0
+                sta ah
+
+                lda input_state.p
+                lsr a           ;set up C
+                lda input_state.a
+                adc input_state.operand
+                bne got_z
+
+                lda simulated_state.p
+                ora #P.Z
+                sta simulated_state.p
+got_z:
+                
+                lda input_state.p
+                lsr a           ;set up C
+
+                lda input_state.a
+                and #$0f
+                sta al
+
+                lda input_state.operand
+                and #$0f
+                adc al
+
+                cmp #10
+                bcc +
+
+                sbc #10
+                and #$0f
+
+                inc ah
++
+                sta al
+
+                lda input_state.a
+                lsr a
+                lsr a
+                lsr a
+                lsr a
+                clc
+                adc ah
+                sta ah
+
+                lda input_state.operand
+                lsr a
+                lsr a
+                lsr a
+                lsr a
+                clc
+                adc ah
+                sta ah
+
+                lda ah
+                and #8
+                beq got_n
+
+                lda simulated_state.p
+                ora #P.N
+                sta simulated_state.p
+got_n:
+
+                lda ah
+                asl a
+                asl a
+                asl a
+                asl a
+                eor input_state.a
+                bpl got_v
+
+                lda input_state.a
+                eor input_state.operand
+                bmi got_v
+
+                lda simulated_state.p
+                ora #P.V
+                sta simulated_state.p
+got_v:
+
+                lda ah
+
+                cmp #10
+                bcc +
+
+                sbc #10
+                and #$0f
+                sta ah
+
+                lda simulated_state.p
+                ora #P.C
+                sta simulated_state.p
++
+                
+                lda al
+                and #$0f
+                sta simulated_state.a
+                
+                lda ah
+                asl a
+                asl a
+                asl a
+                asl a
+                ora simulated_state.a
+                sta simulated_state.a
+
+                .simulate_x
+                .simulate_y
+                .simulate_s
+                .simulate_operand
+                rts
+                
+                .endproc
+
+;-------------------------------------------------------------------------
+
+exec_sbc_bcd_zpg: .proc
+                sed
+                sbc input_state.operand
+                cld
+                jmp exec_done
+                .endproc
+
+simulate_sbc_bcd_nmos: .proc
+ah=bcd_ah
+al=bcd_al
+
+                ; lda input_state.p
+                ; and #~(P.N|P.V|P.Z|P.C)
+                ; sta simulated_state.p
+
+                lda #0
+                sta ah
+                
+                lda input_state.p
+                lsr a           ;set up C
+
+                lda input_state.operand
+                and #$0f
+                sta al
+                
+                lda input_state.a
+                and #$0f
+                sbc al
+                sta al
+
+                lda input_state.operand
+                lsr a
+                lsr a
+                lsr a
+                lsr a
+                sta ah
+
+                lda input_state.a
+                lsr a
+                lsr a
+                lsr a
+                lsr a
+                sec
+                sbc ah
+                sta ah
+
+                lda al
+                and #$10
+                beq +
+
+                sec
+                lda al
+                sbc #6
+                and #$0f
+                sta al
+
+                dec ah
++
+
+                lda ah
+                and #$10
+                beq +
+
+                sec
+                lda ah
+                sbc #6
+                and #$0f
+                sta ah
++
+
+                lda al
+                and #$0f
+                sta simulated_state.a
+                lda ah
+                asl a
+                asl a
+                asl a
+                asl a
+                ora simulated_state.a
+                sta simulated_state.a
+
+                lda input_state.p
+                lsr a           ;set up C
+                lda input_state.a
+                sbc input_state.operand
+                .simulate_p P.N|P.V|P.Z|P.C
+
+                .simulate_x
+                .simulate_y
+                .simulate_s
+                .simulate_operand
+                rts
+                
                 .endproc
                 
 ;-------------------------------------------------------------------------
