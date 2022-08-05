@@ -501,7 +501,7 @@ next_operand_with_progress:
 
                 ; select next operand, C, D. If operand changed,
                 ; return to caller; otherwise, loop or done.
-next_operand_C_D:
+next_operand_C_D: .proc
                 lda input_state.p
                 eor #P.C
                 sta input_state.p
@@ -515,10 +515,11 @@ next_operand_C_D:
                 bne test_one_state_loop
 
                 jmp next_operand_with_progress
+                .endproc
                 
 ;-------------------------------------------------------------------------
 
-cycle_operand_S:
+cycle_operand_S: .proc
                 .step_value input_state.operand
                 bne test_one_state_loop
 
@@ -534,7 +535,8 @@ cycle_operand_S:
                 bne test_one_state_loop
 
                 jmp instruction_test_done
-
+                .endproc
+                
 ;-------------------------------------------------------------------------
 
 progress: .proc
@@ -650,37 +652,37 @@ tests:
 
 ;-------------------------------------------------------------------------
 
-exec_lax_zpg: .block
+exec_lax_zpg: .proc
                 lax output_state.operand
                 jmp exec_done
-                .endblock
+                .endproc
 
-exec_lax_zpy: .block
+exec_lax_zpy: .proc
                 lax output_state.operand,y
                 jmp exec_done
-                .endblock
+                .endproc
 
-exec_lax_abs: .block
+exec_lax_abs: .proc
                 lax @w output_state.operand
                 jmp exec_done
-                .endblock
+                .endproc
 
-exec_lax_aby: .block
+exec_lax_aby: .proc
                 lax @w output_state.operand,y
                 jmp exec_done
-                .endblock
+                .endproc
 
-exec_lax_inx: .block
+exec_lax_inx: .proc
                 lax (output_operand_ptr,x)
                 jmp exec_done
-                .endblock
+                .endproc
 
-exec_lax_iny: .block
+exec_lax_iny: .proc
                 lax (output_operand_ptr),y
                 jmp exec_done
-                .endblock
+                .endproc
 
-simulate_lax:
+simulate_lax: .proc
                 lda input_state.operand
                 sta simulated_state.a
                 sta simulated_state.x
@@ -689,15 +691,16 @@ simulate_lax:
                 .simulate_s
                 .simulate_operand
                 rts
-
+                .endproc
+                
 ;-------------------------------------------------------------------------
 
-exec_asr_imm: .block
+exec_asr_imm: .proc
                 asr #0
                 jmp exec_done
-                .endblock
+                .endproc
 
-simulate_asr:
+simulate_asr: .proc
                 lda input_state.a
                 and input_state.operand
                 lsr a
@@ -716,20 +719,21 @@ simulate_asr:
                 .simulate_s
                 .simulate_operand
                 rts
+                .endproc
 
 ;-------------------------------------------------------------------------
 
-exec_anc_imm: .block
+exec_anc_imm: .proc
                 anc #0
                 jmp exec_done
-                .endblock
+                .endproc
 
-exec_anc2_imm: .block
+exec_anc2_imm: .proc
                 .byte $2b,$00
                 jmp exec_done
-                .endblock
+                .endproc
 
-simulate_anc:
+simulate_anc: .proc
                 lda input_state.a
                 and input_state.operand
                 sta simulated_state.a
@@ -743,38 +747,46 @@ simulate_anc:
                 .simulate_s
                 .simulate_operand
                 rts
-
+                .endproc
+                
 ;-------------------------------------------------------------------------
 
-exec_dcp_zpg:
+exec_dcp_zpg: .proc
                 dcp output_state.operand
                 jmp exec_done
-
-exec_dcp_zpx:
+                .endproc
+                
+exec_dcp_zpx: .proc
                 dcp output_state.operand,x
                 jmp exec_done
-
-exec_dcp_abs:
+                .endproc
+                
+exec_dcp_abs: .proc
                 dcp @w output_state.operand
                 jmp exec_done
-
-exec_dcp_abx:
+                .endproc
+                
+exec_dcp_abx: .proc
                 dcp @w output_state.operand,x
                 jmp exec_done
-
-exec_dcp_aby:
+                .endproc
+                
+exec_dcp_aby: .proc
                 dcp @w output_state.operand,y
                 jmp exec_done
-
-exec_dcp_inx:
+                .endproc
+                
+exec_dcp_inx: .proc
                 dcp (output_operand_ptr,x)
                 jmp exec_done
-
-exec_dcp_iny:
+                .endproc
+                
+exec_dcp_iny: .proc
                 dcp (output_operand_ptr),y
                 jmp exec_done
-
-simulate_dcp:
+                .endproc
+                
+simulate_dcp: .proc
                 ldx input_state.operand
                 dex
                 stx simulated_state.operand
@@ -787,36 +799,44 @@ simulate_dcp:
                 .simulate_y
                 .simulate_s
                 rts
-
+                .endproc
+                
 ;-------------------------------------------------------------------------
 
-exec_isb_zpg:
+exec_isb_zpg: .proc
                 isb output_state.operand
                 jmp exec_done
-
-exec_isb_zpx:
+                .endproc
+                
+exec_isb_zpx: .proc
                 isb output_state.operand,x
                 jmp exec_done
-
-exec_isb_abs:
+                .endproc
+                
+exec_isb_abs: .proc
                 isb @w output_state.operand
                 jmp exec_done
-
-exec_isb_abx:
+                .endproc
+                
+exec_isb_abx: .proc
                 isb @w output_state.operand,x
                 jmp exec_done
-
-exec_isb_aby:
+                .endproc
+                
+exec_isb_aby: .proc
                 isb @w output_state.operand,y
                 jmp exec_done
-
-exec_isb_inx:
+                .endproc
+                
+exec_isb_inx: .proc
                 isb (output_operand_ptr,x)
                 jmp exec_done
-
-exec_isb_iny:
+                .endproc
+                
+exec_isb_iny: .proc
                 isb (output_operand_ptr),y
                 jmp exec_done
+                .endproc
                 
 simulate_isb: .proc
                 ldx input_state.operand
@@ -842,11 +862,12 @@ simulate_isb: .proc
 
 ;-------------------------------------------------------------------------
 
-exec_lds_aby:
+exec_lds_aby: .proc
                 lds output_state.operand,y
                 jmp exec_done
-
-simulate_lds:
+                .endproc
+                
+simulate_lds: .proc
                 lda input_state.operand
                 and input_state.s
                 sta simulated_state.a
@@ -866,38 +887,46 @@ simulate_lds:
                 .simulate_y
                 .simulate_operand
                 rts
-
+                .endproc
+                
 ;-------------------------------------------------------------------------
 
-exec_slo_zpg:
+exec_slo_zpg: .proc
                 slo output_state.operand
                 jmp exec_done
-
-exec_slo_zpx:
+                .endproc
+                
+exec_slo_zpx: .proc
                 slo output_state.operand,x
                 jmp exec_done
-
-exec_slo_abs:
+                .endproc
+                
+exec_slo_abs: .proc
                 slo @w output_state.operand
                 jmp exec_done
-
-exec_slo_abx:
+                .endproc
+                
+exec_slo_abx: .proc
                 slo @w output_state.operand,x
                 jmp exec_done
-
-exec_slo_aby:
+                .endproc
+                
+exec_slo_aby: .proc
                 slo @w output_state.operand,y
                 jmp exec_done
-
-exec_slo_inx:
+                .endproc
+                
+exec_slo_inx: .proc
                 slo (output_operand_ptr,x)
                 jmp exec_done
-
-exec_slo_iny:
+                .endproc
+                
+exec_slo_iny: .proc
                 slo (output_operand_ptr),y
                 jmp exec_done
-
-simulate_slo:
+                .endproc
+                
+simulate_slo: .proc
                 lda input_state.operand
                 asl a
                 sta simulated_state.operand
@@ -909,38 +938,46 @@ simulate_slo:
                 .simulate_y
                 .simulate_s
                 rts
-
+                .endproc
+                
 ;-------------------------------------------------------------------------
 
-exec_sre_zpg:
+exec_sre_zpg: .proc
                 sre output_state.operand
                 jmp exec_done
-
-exec_sre_zpx:
+                .endproc
+                
+exec_sre_zpx: .proc
                 sre output_state.operand,x
                 jmp exec_done
-
-exec_sre_abs:
+                .endproc
+                
+exec_sre_abs: .proc
                 sre @w output_state.operand
                 jmp exec_done
-
-exec_sre_abx:
+                .endproc
+                
+exec_sre_abx: .proc
                 sre @w output_state.operand,x
                 jmp exec_done
-
-exec_sre_aby:
+                .endproc
+                
+exec_sre_aby: .proc
                 sre @w output_state.operand,y
                 jmp exec_done
-
-exec_sre_inx:
+                .endproc
+                
+exec_sre_inx: .proc
                 sre (output_operand_ptr,x)
                 jmp exec_done
-
-exec_sre_iny:
+                .endproc
+                
+exec_sre_iny: .proc
                 sre (output_operand_ptr),y
                 jmp exec_done
-
-simulate_sre:
+                .endproc
+                
+simulate_sre: .proc
                 lda input_state.operand
                 lsr a
                 sta simulated_state.operand
@@ -952,12 +989,14 @@ simulate_sre:
                 .simulate_y
                 .simulate_s
                 rts
+                .endproc
 
 ;-------------------------------------------------------------------------
 
-exec_arr_imm:
+exec_arr_imm: .proc
                 arr #0
                 jmp exec_done
+                .endproc
 
 simulate_arr: .proc
                 .section zp_bss
@@ -1085,35 +1124,42 @@ done_higher_nybble:
 
 ;-------------------------------------------------------------------------
 
-exec_rla_zpg:
+exec_rla_zpg: .proc
                 rla output_state.operand
                 jmp exec_done
-
-exec_rla_zpx:
+                .endproc
+                
+exec_rla_zpx: .proc
                 rla output_state.operand,x
                 jmp exec_done
-
-exec_rla_abs:
+                .endproc
+                
+exec_rla_abs: .proc
                 rla @w output_state.operand
                 jmp exec_done
-
-exec_rla_abx:
+                .endproc
+                
+exec_rla_abx: .proc
                 rla @w output_state.operand,x
                 jmp exec_done
-
-exec_rla_aby:
+                .endproc
+                
+exec_rla_aby: .proc
                 rla @w output_state.operand,y
                 jmp exec_done
-
-exec_rla_inx:
+                .endproc
+                
+exec_rla_inx: .proc
                 rla (output_operand_ptr,x)
                 jmp exec_done
-
-exec_rla_iny:
+                .endproc
+                
+exec_rla_iny: .proc
                 rla (output_operand_ptr),y
                 jmp exec_done
-
-simulate_rla:
+                .endproc
+                
+simulate_rla: .proc
                 lda input_state.p
                 lsr a           ;set up C
                 
@@ -1129,38 +1175,46 @@ simulate_rla:
                 .simulate_y
                 .simulate_s
                 rts
+                .endproc
 
 ;-------------------------------------------------------------------------
 
-exec_rra_zpg:
+exec_rra_zpg: .proc
                 rra output_state.operand
                 jmp exec_done
-
-exec_rra_zpx:
+                .endproc
+                
+exec_rra_zpx: .proc
                 rra output_state.operand,x
                 jmp exec_done
-
-exec_rra_abs:
+                .endproc
+                
+exec_rra_abs: .proc
                 rra @w output_state.operand
                 jmp exec_done
-
-exec_rra_abx:
+                .endproc
+                
+exec_rra_abx: .proc
                 rra @w output_state.operand,x
                 jmp exec_done
-
-exec_rra_aby:
+                .endproc
+                
+exec_rra_aby: .proc
                 rra @w output_state.operand,y
                 jmp exec_done
-
-exec_rra_inx:
+                .endproc
+                
+exec_rra_inx: .proc
                 rra (output_operand_ptr,x)
                 jmp exec_done
-
-exec_rra_iny:
+                .endproc
+                
+exec_rra_iny: .proc
                 rra (output_operand_ptr),y
                 jmp exec_done
-
-simulate_rra:
+                .endproc
+                
+simulate_rra: .proc
                 lda input_state.p
                 lsr a           ;set up C
                 and #P.D>>1
@@ -1179,7 +1233,8 @@ simulate_rra:
                 .simulate_y
                 .simulate_s
                 rts
-
+                .endproc
+                
 ;-------------------------------------------------------------------------
 
 print_states: .proc
