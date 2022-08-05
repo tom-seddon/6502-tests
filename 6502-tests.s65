@@ -567,14 +567,20 @@ progress: .proc
 
                 bit show_progress
                 bpl done
+
+                pha
+                and #$0f
+                cmp #$f
+                pla
+                bcs done
                 
                 pha
                 lda #' '
                 jsr oswrch
                 pla
-                jsr print_hex
-                lda #8
+                jsr get_hi_nybble_ascii
                 jsr oswrch
+                lda #8
                 jsr oswrch
                 jsr oswrch
 done:
