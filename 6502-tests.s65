@@ -5,6 +5,12 @@
                 .include "./submodules/beeb/include/beeb.s65"
 
 STEP=$1
+
+                ; empty list means run all tests.
+tests_to_run=[]
+
+should_run_test: .sfunction name,len(tests_to_run)==0||name in tests_to_run
+                
                 
 ;-------------------------------------------------------------------------
 
@@ -157,10 +163,6 @@ index_type: .fill 1
                 ; when bit 7 set, show fancy(ish) progress display.
                 ; Inhibited when *SPOOLing.
 show_progress: .fill 1
-
-                ; Working data for the rather fiddly ARR instruction.
-arr_t: .fill 1
-arr_av: .fill 1
 
                 .endsection zp_bss
 
@@ -558,18 +560,20 @@ done:
 ;-------------------------------------------------------------------------
 
 tests:
-                .Test exec_lax_zpg,Index.none,simulate_lax,cycle_operand,"lax $nn"
-                .Test exec_lax_zpy,Index.y,simulate_lax,cycle_operand,"lax $nn,y"
-                .Test exec_lax_abs,Index.none,simulate_lax,cycle_operand,"lax $nnnn"
-                .Test exec_lax_aby,Index.y,simulate_lax,cycle_operand,"lax $nnnn,y"
-                .Test exec_lax_inx,Index.x,simulate_lax,cycle_operand,"lax ($nn,x)"
-                .Test exec_lax_iny,Index.y,simulate_lax,cycle_operand,"lax ($nn),y"
-                
+                .if should_run_test('arr')
+                .Test exec_arr_imm,Index.none,simulate_arr,cycle_imm_A_C_D,"arr #$nn"
+                .endif
+
+                .if should_run_test('asr')             
                 .Test exec_asr_imm,Index.none,simulate_asr,cycle_imm_A_C,"asr #$nn"
-                
+                .endif
+
+                .if should_run_test('anc')
                 .Test exec_anc_imm,Index.none,simulate_anc,cycle_imm_A_C,"anc #$nn"
                 .Test exec_anc2_imm,Index.none,simulate_anc,cycle_imm_A_C,"anc2 #$nn"
+                .endif
 
+                .if should_run_test('dcp')
                 .Test exec_dcp_zpg,Index.none,simulate_dcp,cycle_operand_A_C,"dcp $nn"
                 .Test exec_dcp_zpx,Index.x,simulate_dcp,cycle_operand_A_C,"dcp $nn,x"
                 .Test exec_dcp_abs,Index.none,simulate_dcp,cycle_operand_A_C,"dcp $nnnn"
@@ -577,7 +581,9 @@ tests:
                 .Test exec_dcp_aby,Index.y,simulate_dcp,cycle_operand_A_C,"dcp $nnnn,y"
                 .Test exec_dcp_inx,Index.x,simulate_dcp,cycle_operand_A_C,"dcp ($nn,x)"
                 .Test exec_dcp_iny,Index.y,simulate_dcp,cycle_operand_A_C,"dcp ($nn),y"
-
+                .endif
+                
+                .if should_run_test('icb')
                 .Test exec_isb_zpg,Index.none,simulate_isb,cycle_operand_A_C,"isb $nn"
                 .Test exec_isb_zpx,Index.x,simulate_isb,cycle_operand_A_C,"isb $nn,x"
                 .Test exec_isb_abs,Index.none,simulate_isb,cycle_operand_A_C,"isb $nnnn"
@@ -585,9 +591,42 @@ tests:
                 .Test exec_isb_aby,Index.y,simulate_isb,cycle_operand_A_C,"isb $nnnn,y"
                 .Test exec_isb_inx,Index.x,simulate_isb,cycle_operand_A_C,"isb ($nn,x)"
                 .Test exec_isb_iny,Index.y,simulate_isb,cycle_operand_A_C,"isb ($nn),y"
-
+                .endif
+                
+                .if should_run_test('lax')
+                .Test exec_lax_zpg,Index.none,simulate_lax,cycle_operand,"lax $nn"
+                .Test exec_lax_zpy,Index.y,simulate_lax,cycle_operand,"lax $nn,y"
+                .Test exec_lax_abs,Index.none,simulate_lax,cycle_operand,"lax $nnnn"
+                .Test exec_lax_aby,Index.y,simulate_lax,cycle_operand,"lax $nnnn,y"
+                .Test exec_lax_inx,Index.x,simulate_lax,cycle_operand,"lax ($nn,x)"
+                .Test exec_lax_iny,Index.y,simulate_lax,cycle_operand,"lax ($nn),y"
+                .endif
+                
+                .if should_run_test('lds')
                 .Test exec_lds_aby,Index.y,simulate_lds,cycle_operand_S,"lds $nnnn,y"
+                .endif
 
+                .if should_run_test('rla')
+                .Test exec_rla_zpg,Index.none,simulate_rla,cycle_operand_A_C,"rla $nn"
+                .Test exec_rla_zpx,Index.x,simulate_rla,cycle_operand_A_C,"rla $nn,x"
+                .Test exec_rla_abs,Index.none,simulate_rla,cycle_operand_A_C,"rla $nnnn"
+                .Test exec_rla_abx,Index.x,simulate_rla,cycle_operand_A_C,"rla $nnnn,x"
+                .Test exec_rla_aby,Index.y,simulate_rla,cycle_operand_A_C,"rla $nnnn,y"
+                .Test exec_rla_inx,Index.x,simulate_rla,cycle_operand_A_C,"rla ($nn,x)"
+                .Test exec_rla_iny,Index.y,simulate_rla,cycle_operand_A_C,"rla ($nn),y"
+                .endif                
+                
+                .if should_run_test('rra')
+                .Test exec_rra_zpg,Index.none,simulate_rra,cycle_operand_A_C_D,"rra $nn"
+                .Test exec_rra_zpx,Index.x,simulate_rra,cycle_operand_A_C_D,"rra $nn,x"
+                .Test exec_rra_abs,Index.none,simulate_rra,cycle_operand_A_C_D,"rra $nnnn"
+                .Test exec_rra_abx,Index.x,simulate_rra,cycle_operand_A_C_D,"rra $nnnn,x"
+                .Test exec_rra_aby,Index.y,simulate_rra,cycle_operand_A_C_D,"rra $nnnn,y"
+                .Test exec_rra_inx,Index.x,simulate_rra,cycle_operand_A_C_D,"rra ($nn,x)"
+                .Test exec_rra_iny,Index.y,simulate_rra,cycle_operand_A_C_D,"rra ($nn),y"
+                .endif
+                
+                .if should_run_test('slo')
                 .Test exec_slo_zpg,Index.none,simulate_slo,cycle_operand_A_C,"slo $nn"
                 .Test exec_slo_zpx,Index.x,simulate_slo,cycle_operand_A_C,"slo $nn,x"
                 .Test exec_slo_abs,Index.none,simulate_slo,cycle_operand_A_C,"slo $nnnn"
@@ -595,7 +634,9 @@ tests:
                 .Test exec_slo_aby,Index.y,simulate_slo,cycle_operand_A_C,"slo $nnnn,y"
                 .Test exec_slo_inx,Index.x,simulate_slo,cycle_operand_A_C,"slo ($nn,x)"
                 .Test exec_slo_iny,Index.y,simulate_slo,cycle_operand_A_C,"slo ($nn),y"
+                .endif
                 
+                .if should_run_test('sre')
                 .Test exec_sre_zpg,Index.none,simulate_sre,cycle_operand_A_C,"sre $nn"
                 .Test exec_sre_zpx,Index.x,simulate_sre,cycle_operand_A_C,"sre $nn,x"
                 .Test exec_sre_abs,Index.none,simulate_sre,cycle_operand_A_C,"sre $nnnn"
@@ -603,9 +644,8 @@ tests:
                 .Test exec_sre_aby,Index.y,simulate_sre,cycle_operand_A_C,"sre $nnnn,y"
                 .Test exec_sre_inx,Index.x,simulate_sre,cycle_operand_A_C,"sre ($nn,x)"
                 .Test exec_sre_iny,Index.y,simulate_sre,cycle_operand_A_C,"sre ($nn),y"
-
-                .Test exec_arr_imm,Index.none,simulate_arr,cycle_imm_A_C_D,"arr #$nn"
-             
+                .endif
+                
                 .word 0
 
 ;-------------------------------------------------------------------------
@@ -913,6 +953,12 @@ exec_arr_imm:
                 jmp exec_done
 
 simulate_arr: .proc
+                .section zp_bss
+                ; Working data for the rather fiddly ARR instruction.
+t: .fill 1
+av: .fill 1
+                .endsection
+                
                 .simulate_operand
                 .simulate_x
                 .simulate_y
@@ -963,7 +1009,7 @@ bcd: .block
 
                 lda input_state.a
                 and input_state.operand ;do the AND
-                sta arr_t
+                sta t
                 ror a                   ;do the ROR
                 sta simulated_state.a
 
@@ -971,7 +1017,7 @@ bcd: .block
 
                 ; set V
                 lda simulated_state.a
-                eor arr_t
+                eor t
                 and #$40
                 cmp #1          ;C=1 if bit 6 set
                 lda simulated_state.p
@@ -981,9 +1027,9 @@ bcd: .block
 got_v:
                 sta simulated_state.p
 
-                lda arr_t
+                lda t
                 lsr a           ;C=al&1
-                lda arr_t
+                lda t
                 and #$0f
                 adc #0          ;al+(al&1)
                 cmp #6
@@ -993,22 +1039,22 @@ got_v:
                 lda simulated_state.a ;s->a
                 adc #6                ;s->a+6
                 and #$0f              ;s->a+6&0xf
-                sta arr_av
+                sta av
 
                 lda simulated_state.a ;s->a
                 and #$f0              ;s->a&0xf0
-                ora arr_av            ;s->a&0xf0|s->a+6&0xf
+                ora av            ;s->a&0xf0|s->a+6&0xf
                 sta simulated_state.a
 done_lower_nybble:
 
-                lda arr_t
+                lda t
                 lsr a
                 lsr a
                 lsr a
                 lsr a           ;t>>4
-                sta arr_av
+                sta av
                 lsr a           ;C=t>>4&1
-                lda arr_av          ;t>>4
+                lda av          ;t>>4
                 adc #0          ;t>>4+t>>4&1
                 cmp #6          ;C=1 if ah+(ah&1)>5
                 bcc done_higher_nybble
@@ -1029,6 +1075,103 @@ done_higher_nybble:
                 .endblock
 
                 .endproc
+
+;-------------------------------------------------------------------------
+
+exec_rla_zpg:
+                rla output_state.operand
+                jmp exec_done
+
+exec_rla_zpx:
+                rla output_state.operand,x
+                jmp exec_done
+
+exec_rla_abs:
+                rla @w output_state.operand
+                jmp exec_done
+
+exec_rla_abx:
+                rla @w output_state.operand,x
+                jmp exec_done
+
+exec_rla_aby:
+                rla @w output_state.operand,y
+                jmp exec_done
+
+exec_rla_inx:
+                rla (output_operand_ptr,x)
+                jmp exec_done
+
+exec_rla_iny:
+                rla (output_operand_ptr),y
+                jmp exec_done
+
+simulate_rla:
+                lda input_state.p
+                lsr a           ;set up C
+                
+                lda input_state.operand
+                rol a
+                sta simulated_state.operand
+                lda input_state.a
+                and simulated_state.operand
+                sta simulated_state.a
+                
+                .simulate_p P.N|P.Z|P.C
+                .simulate_x
+                .simulate_y
+                .simulate_s
+                rts
+
+;-------------------------------------------------------------------------
+
+exec_rra_zpg:
+                rra output_state.operand
+                jmp exec_done
+
+exec_rra_zpx:
+                rra output_state.operand,x
+                jmp exec_done
+
+exec_rra_abs:
+                rra @w output_state.operand
+                jmp exec_done
+
+exec_rra_abx:
+                rra @w output_state.operand,x
+                jmp exec_done
+
+exec_rra_aby:
+                rra @w output_state.operand,y
+                jmp exec_done
+
+exec_rra_inx:
+                rra (output_operand_ptr,x)
+                jmp exec_done
+
+exec_rra_iny:
+                rra (output_operand_ptr),y
+                jmp exec_done
+
+simulate_rra:
+                lda input_state.p
+                lsr a           ;set up C
+                and #P.D>>1
+                beq +
+                sed
++
+                lda input_state.operand
+                ror a
+                sta simulated_state.operand
+                lda input_state.a
+                adc simulated_state.operand
+                cld
+                sta simulated_state.a
+                .simulate_p P.N|P.Z|P.V|P.C
+                .simulate_x
+                .simulate_y
+                .simulate_s
+                rts
 
 ;-------------------------------------------------------------------------
 
