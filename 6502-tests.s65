@@ -7,7 +7,7 @@
 STEP=$1
 
                 ; empty list means run all tests.
-tests_to_run=['usbc']
+tests_to_run=['sax']
 
 should_run_test: .sfunction name,len(tests_to_run)==0||name in tests_to_run
                 
@@ -589,6 +589,168 @@ done:
                 
 ;-------------------------------------------------------------------------
 
+print_states: .proc
+                ldx #input_state
+                lda #'I'
+                jsr print_state
+
+                ldx #output_state
+                lda #'o'
+                jsr print_state
+
+                ldx #simulated_state
+                lda #'s'
+                jsr print_state
+
+                rts
+
+print_state:
+                jsr oswrch
+
+                lda #':'
+                jsr oswrch
+                
+                lda State.operand,x
+                ldy #'O'
+                jsr reg
+                
+                lda State.a,x
+                ldy #'A'
+                jsr reg
+
+                lda State.x,x
+                ldy #'X'
+                jsr reg
+
+                lda State.y,x
+                ldy #'Y'
+                jsr reg
+
+                lda State.s,x
+                ldy #'S'
+                jsr reg
+
+                lda #' '
+                jsr oswrch
+
+                lda State.p,x
+                ldy #7
+-
+                asl a
+                pha
+                lda p_bits,y
+                bcs +
+                ora #$20
++
+                jsr oswrch
+                pla
+                dey
+                bpl -
+
+                jsr osnewl
+
+                bit $ff
+                bmi all_tests_done
+
+                rts
+
+reg:
+                pha
+                lda #' '
+                jsr oswrch
+                tya
+                jsr oswrch
+                lda #'='
+                jsr oswrch
+                pla
+                jmp print_hex
+                
+
+p_bits: .text 'CZIDBUVN'
+                .endproc
+                
+;-------------------------------------------------------------------------
+
+print0: .proc
+                pla
+                sta print_ptr+0
+                pla
+                sta print_ptr+1
+
+loop:
+                ldx #print_ptr
+                jsr incz16
+                
+                lda #218        ;items in VDU queue (AUG p221)
+                jsr osbyte_x00_yff
+                
+                ldy #0
+                lda (print_ptr),y
+
+                cpx #0
+                bne print
+
+                cmp #0
+                beq done
+
+print:
+                jsr oswrch
+
+                
+                jmp loop
+
+done:
+                ldx #print_ptr
+                jsr incz16
+                jmp (print_ptr)
+                
+                .endproc   
+
+;-------------------------------------------------------------------------
+
+incz16:
+                inc 0,x
+                bne +
+                inc 1,x
++
+                rts
+                
+;-------------------------------------------------------------------------
+
+osbyte_x00_yff:
+                ldx #$00
+                ldy #$ff
+                jmp osbyte
+                
+;-------------------------------------------------------------------------
+
+get_hi_nybble_ascii:
+                lsr a
+                lsr a
+                lsr a
+                lsr a
+get_lo_nybble_ascii:
+                and #$0f
+                sed
+                clc
+                adc #$90
+                adc #$40
+                cld
+                rts
+
+print_hex:
+                pha
+                pha
+                jsr get_hi_nybble_ascii
+                jsr oswrch
+                pla
+                jsr get_lo_nybble_ascii
+                jsr oswrch
+                pla
+                rts
+                
+;-------------------------------------------------------------------------
+                
 tests:
                 .if should_run_test('adc_bcd_nmos')
                 .Test exec_adc_bcd_zpg,Index.none,simulate_adc_bcd_nmos,cycle_operand_A_C,"adc $nn (BCD) (NMOS)"
@@ -1589,169 +1751,6 @@ simulate_sax: .proc
                 rts
                 .endproc
                 
-;-------------------------------------------------------------------------
 
-print_states: .proc
-                ldx #input_state
-                lda #'I'
-                jsr print_state
-
-                ldx #output_state
-                lda #'o'
-                jsr print_state
-
-                ldx #simulated_state
-                lda #'s'
-                jsr print_state
-
-                rts
-
-print_state:
-                jsr oswrch
-
-                lda #':'
-                jsr oswrch
-                
-                lda State.operand,x
-                ldy #'O'
-                jsr reg
-                
-                lda State.a,x
-                ldy #'A'
-                jsr reg
-
-                lda State.x,x
-                ldy #'X'
-                jsr reg
-
-                lda State.y,x
-                ldy #'Y'
-                jsr reg
-
-                lda State.s,x
-                ldy #'S'
-                jsr reg
-
-                lda #' '
-                jsr oswrch
-
-                lda State.p,x
-                ldy #7
--
-                asl a
-                pha
-                lda p_bits,y
-                bcs +
-                ora #$20
-+
-                jsr oswrch
-                pla
-                dey
-                bpl -
-
-                jsr osnewl
-
-                bit $ff
-                bmi all_tests_done
-
-                rts
-
-reg:
-                pha
-                lda #' '
-                jsr oswrch
-                tya
-                jsr oswrch
-                lda #'='
-                jsr oswrch
-                pla
-                jmp print_hex
-                
-
-p_bits: .text 'CZIDBUVN'
-                .endproc
-                
-;-------------------------------------------------------------------------
-
-print0: .proc
-                pla
-                sta print_ptr+0
-                pla
-                sta print_ptr+1
-
-loop:
-                ldx #print_ptr
-                jsr incz16
-                
-                lda #218        ;items in VDU queue (AUG p221)
-                jsr osbyte_x00_yff
-                
-                ldy #0
-                lda (print_ptr),y
-
-                cpx #0
-                bne print
-
-                cmp #0
-                beq done
-
-print:
-                jsr oswrch
-
-                
-                jmp loop
-
-done:
-                ldx #print_ptr
-                jsr incz16
-                jmp (print_ptr)
-                
-                .endproc   
-
-;-------------------------------------------------------------------------
-
-incz16:
-                inc 0,x
-                bne +
-                inc 1,x
-+
-                rts
-                
-;-------------------------------------------------------------------------
-
-osbyte_x00_yff:
-                ldx #$00
-                ldy #$ff
-                jmp osbyte
-                
-;-------------------------------------------------------------------------
-
-get_hi_nybble_ascii:
-                lsr a
-                lsr a
-                lsr a
-                lsr a
-get_lo_nybble_ascii:
-                and #$0f
-                sed
-                clc
-                adc #$90
-                adc #$40
-                cld
-                rts
-
-print_hex:
-                pha
-                pha
-                jsr get_hi_nybble_ascii
-                jsr oswrch
-                pla
-                jsr get_lo_nybble_ascii
-                jsr oswrch
-                pla
-                rts
-                
-;-------------------------------------------------------------------------
-                
                 .endsection code
                 
