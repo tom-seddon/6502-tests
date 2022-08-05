@@ -7,7 +7,7 @@
 STEP=$1
 
                 ; empty list means run all tests.
-tests_to_run=['sax']
+tests_to_run=[]
 
 should_run_test: .sfunction name,len(tests_to_run)==0||name in tests_to_run
                 
@@ -126,7 +126,7 @@ step_value: .macro reg
 
 ;-------------------------------------------------------------------------
 
-*=0
+*=$60
                 .dsection zp_bss
                 .cerror *>$90,'zp overflow'
 
@@ -167,12 +167,16 @@ show_progress: .fill 1
                 ; working data for BCD arithmetic
 bcd_ah: .fill 1
 bcd_al: .fill 1
+
+                ; bit 7 set if CMOS CPU
+is_cmos: .fill 1
                 .endsection zp_bss
 
 ;-------------------------------------------------------------------------
 
                 .section code
 
+                lda $fffe
                 sta $fffe
                 
                 .cpu '65c02'
@@ -180,11 +184,10 @@ bcd_al: .fill 1
                 phx             ;1-byte NOP on NMOS
                 inx
                 plx             ;1-byte NOP on NMOS
-                beq +
-                brk
-                .text 255,'Requires NMOS 6502',0
-+
+                ; X=$00 on NMOS, X=$ff on CMOS
                 .cpu 'default'
+
+                stx is_cmos
 
                 lda #$80
                 sta show_progress
@@ -200,9 +203,20 @@ bcd_al: .fill 1
                 jsr osbyte_x00_yff
                 stx old_language_rom
 
-                lda #<tests
+                bit is_cmos
+                bpl prepare_nmos_tests
+
+prepare_cmos_tests:
+                lda #<cmos_tests
                 sta test_ptr+0
-                lda #>tests
+                lda #>cmos_tests
+                sta test_ptr+1
+                jmp run_instruction_test_loop
+
+prepare_nmos_tests:
+                lda #<nmos_tests
+                sta test_ptr+0
+                lda #>nmos_tests
                 sta test_ptr+1
 
 run_instruction_test_loop:
@@ -357,6 +371,7 @@ bad:
                 ; ...
 
 instruction_test_done:
+                lda $ffff
                 sta $ffff
 
                 bit any_bad
@@ -751,7 +766,7 @@ print_hex:
                 
 ;-------------------------------------------------------------------------
                 
-tests:
+nmos_tests:
                 .if should_run_test('adc_bcd_nmos')
                 .Test exec_adc_bcd_zpg,Index.none,simulate_adc_bcd_nmos,cycle_operand_A_C,"adc $nn (BCD) (NMOS)"
                 .endif
@@ -862,32 +877,44 @@ tests:
 ;-------------------------------------------------------------------------
 
 exec_lax_zpg: .proc
+                .cpu '6502i'
                 lax output_state.operand
+                .cpu 'default'
                 jmp exec_done
                 .endproc
 
 exec_lax_zpy: .proc
+                .cpu '6502i'
                 lax output_state.operand,y
+                .cpu 'default'
                 jmp exec_done
                 .endproc
 
 exec_lax_abs: .proc
+                .cpu '6502i'
                 lax @w output_state.operand
+                .cpu 'default'
                 jmp exec_done
                 .endproc
 
 exec_lax_aby: .proc
+                .cpu '6502i'
                 lax @w output_state.operand,y
+                .cpu 'default'
                 jmp exec_done
                 .endproc
 
 exec_lax_inx: .proc
+                .cpu '6502i'
                 lax (output_operand_ptr,x)
+                .cpu 'default'
                 jmp exec_done
                 .endproc
 
 exec_lax_iny: .proc
+                .cpu '6502i'
                 lax (output_operand_ptr),y
+                .cpu 'default'
                 jmp exec_done
                 .endproc
 
@@ -905,7 +932,9 @@ simulate_lax: .proc
 ;-------------------------------------------------------------------------
 
 exec_asr_imm: .proc
+                .cpu '6502i'
                 asr #0
+                .cpu 'default'
                 jmp exec_done
                 .endproc
 
@@ -933,7 +962,9 @@ simulate_asr: .proc
 ;-------------------------------------------------------------------------
 
 exec_anc_imm: .proc
+                .cpu '6502i'
                 anc #0
+                .cpu 'default'
                 jmp exec_done
                 .endproc
 
@@ -961,37 +992,51 @@ simulate_anc: .proc
 ;-------------------------------------------------------------------------
 
 exec_dcp_zpg: .proc
+                .cpu '6502i'
                 dcp output_state.operand
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_dcp_zpx: .proc
+                .cpu '6502i'
                 dcp output_state.operand,x
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_dcp_abs: .proc
+                .cpu '6502i'
                 dcp @w output_state.operand
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_dcp_abx: .proc
+                .cpu '6502i'
                 dcp @w output_state.operand,x
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_dcp_aby: .proc
+                .cpu '6502i'
                 dcp @w output_state.operand,y
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_dcp_inx: .proc
+                .cpu '6502i'
                 dcp (output_operand_ptr,x)
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_dcp_iny: .proc
+                .cpu '6502i'
                 dcp (output_operand_ptr),y
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
@@ -1013,37 +1058,51 @@ simulate_dcp: .proc
 ;-------------------------------------------------------------------------
 
 exec_isb_zpg: .proc
+                .cpu '6502i'
                 isb output_state.operand
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_isb_zpx: .proc
+                .cpu '6502i'
                 isb output_state.operand,x
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_isb_abs: .proc
+                .cpu '6502i'
                 isb @w output_state.operand
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_isb_abx: .proc
+                .cpu '6502i'
                 isb @w output_state.operand,x
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_isb_aby: .proc
+                .cpu '6502i'
                 isb @w output_state.operand,y
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_isb_inx: .proc
+                .cpu '6502i'
                 isb (output_operand_ptr,x)
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_isb_iny: .proc
+                .cpu '6502i'
                 isb (output_operand_ptr),y
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
@@ -1072,7 +1131,9 @@ simulate_isb: .proc
 ;-------------------------------------------------------------------------
 
 exec_lds_aby: .proc
+                .cpu '6502i'
                 lds output_state.operand,y
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
@@ -1101,37 +1162,51 @@ simulate_lds: .proc
 ;-------------------------------------------------------------------------
 
 exec_slo_zpg: .proc
+                .cpu '6502i'
                 slo output_state.operand
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_slo_zpx: .proc
+                .cpu '6502i'
                 slo output_state.operand,x
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_slo_abs: .proc
+                .cpu '6502i'
                 slo @w output_state.operand
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_slo_abx: .proc
+                .cpu '6502i'
                 slo @w output_state.operand,x
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_slo_aby: .proc
+                .cpu '6502i'
                 slo @w output_state.operand,y
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_slo_inx: .proc
+                .cpu '6502i'
                 slo (output_operand_ptr,x)
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_slo_iny: .proc
+                .cpu '6502i'
                 slo (output_operand_ptr),y
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
@@ -1152,37 +1227,51 @@ simulate_slo: .proc
 ;-------------------------------------------------------------------------
 
 exec_sre_zpg: .proc
+                .cpu '6502i'
                 sre output_state.operand
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_sre_zpx: .proc
+                .cpu '6502i'
                 sre output_state.operand,x
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_sre_abs: .proc
+                .cpu '6502i'
                 sre @w output_state.operand
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_sre_abx: .proc
+                .cpu '6502i'
                 sre @w output_state.operand,x
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_sre_aby: .proc
+                .cpu '6502i'
                 sre @w output_state.operand,y
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_sre_inx: .proc
+                .cpu '6502i'
                 sre (output_operand_ptr,x)
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_sre_iny: .proc
+                .cpu '6502i'
                 sre (output_operand_ptr),y
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
@@ -1203,7 +1292,9 @@ simulate_sre: .proc
 ;-------------------------------------------------------------------------
 
 exec_arr_imm: .proc
+                .cpu '6502i'
                 arr #0
+                .cpu 'default'
                 jmp exec_done
                 .endproc
 
@@ -1334,37 +1425,51 @@ done_higher_nybble:
 ;-------------------------------------------------------------------------
 
 exec_rla_zpg: .proc
+                .cpu '6502i'
                 rla output_state.operand
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_rla_zpx: .proc
+                .cpu '6502i'
                 rla output_state.operand,x
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_rla_abs: .proc
+                .cpu '6502i'
                 rla @w output_state.operand
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_rla_abx: .proc
+                .cpu '6502i'
                 rla @w output_state.operand,x
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_rla_aby: .proc
+                .cpu '6502i'
                 rla @w output_state.operand,y
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_rla_inx: .proc
+                .cpu '6502i'
                 rla (output_operand_ptr,x)
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_rla_iny: .proc
+                .cpu '6502i'
                 rla (output_operand_ptr),y
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
@@ -1389,37 +1494,51 @@ simulate_rla: .proc
 ;-------------------------------------------------------------------------
 
 exec_rra_zpg: .proc
+                .cpu '6502i'
                 rra output_state.operand
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_rra_zpx: .proc
+                .cpu '6502i'
                 rra output_state.operand,x
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_rra_abs: .proc
+                .cpu '6502i'
                 rra @w output_state.operand
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_rra_abx: .proc
+                .cpu '6502i'
                 rra @w output_state.operand,x
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_rra_aby: .proc
+                .cpu '6502i'
                 rra @w output_state.operand,y
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_rra_inx: .proc
+                .cpu '6502i'
                 rra (output_operand_ptr,x)
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
 exec_rra_iny: .proc
+                .cpu '6502i'
                 rra (output_operand_ptr),y
+                .cpu 'default'
                 jmp exec_done
                 .endproc
                 
@@ -1708,17 +1827,23 @@ simulate_usbc: .proc
 ;-------------------------------------------------------------------------
 
 exec_sax_zpg: .proc
+                .cpu '6502i'
                 sax output_state.operand
+                .cpu 'default'
                 jmp exec_done
                 .endproc
 
 exec_sax_zpy: .proc
+                .cpu '6502i'
                 sax output_state.operand,y
+                .cpu 'default'
                 jmp exec_done
                 .endproc
 
 exec_sax_abs: .proc
+                .cpu '6502i'
                 sax @w output_state.operand
+                .cpu 'default'
                 jmp exec_done
                 .endproc
 
@@ -1733,7 +1858,9 @@ exec_sax_inx: .proc
 do_sub: sbc #0
                 sta do_sax+1
                 lda input_state.a
+                .cpu '6502i'
 do_sax: sax (0,x)
+                .cpu 'default'
                 plp
                 jmp exec_done
                 .endproc
@@ -1750,7 +1877,159 @@ simulate_sax: .proc
                 .simulate_p 0
                 rts
                 .endproc
+
+;-------------------------------------------------------------------------
+
+cmos_tests:
+                .if should_run_test('adc_bcd_cmos')
+                .Test exec_adc_bcd_zpg,Index.none,simulate_adc_bcd_cmos,cycle_operand_A_C,"adc $nn (BCD) (CMOS)"
+                .endif
+
+                .if should_run_test('sbc_bcd_cmos')
+                .Test exec_sbc_bcd_zpg,Index.none,simulate_sbc_bcd_cmos,cycle_operand_A_C,"sbc $nn (BCD) (CMOS)"
+                .endif
+
+                .word 0
+
+;-------------------------------------------------------------------------
+
+simulate_adc_bcd_cmos: .proc
+                jsr simulate_adc_bcd_nmos
+                jsr simulate_bcd_cmos_flags
+                rts
+                .endproc
+
+;-------------------------------------------------------------------------
+
+simulate_sbc_bcd_cmos: .proc
+
+                lda input_state.p
+                and #~(P.N|P.V|P.Z|P.C)
+                sta simulated_state.p
                 
+; int al = (s->a & 0xf) - (s->data & 0xf) - !s->p.bits.c;
+                lda input_state.operand
+                and #$0f
+                sta al+0
+                
+                lda input_state.p
+                lsr a           ;set up C
+
+                lda input_state.a
+                and #$0f
+                sbc al+0
+                sta al+0
+                lda #0
+                sbc #0
+                sta al+1
+
+; int result = s->a - s->data - !s->p.bits.c;
+                lda input_state.p
+                lsr a
+                lda input_state.a
+                sbc input_state.operand
+                sta result+0
+                lda #0
+                sbc #0
+                sta result+1
+
+; s->p.bits.v = ((s->a ^ s->data) & (s->a ^ (uint8_t)result) & 128) != 0;
+                lda input_state.a
+                eor input_state.operand
+                bpl got_v
+
+                lda input_state.a
+                eor result+0
+                bpl got_v
+
+                lda simulated_state.p
+                ora #P.V
+                sta simulated_state.p
+got_v:
+
+; s->p.bits.c = (result & 0x100) == 0;
+                lda result+1
+                and #1
+                bne got_c
+
+                lda simulated_state.p
+                ora #P.C
+                sta simulated_state.p
+got_c:
+
+; if (result < 0) result -= 0x60;
+                
+                lda result+1
+                bpl +
+
+                sec
+                lda result+0
+                sbc #$60
+                sta result+0
+                lda result+1
+                sbc #0
+                sta result+1
++
+
+; if (al < 0) result -= 0x06;
+
+                lda al+1
+                bpl +
+
+                sec
+                lda result+0
+                sbc #6
+                sta result+0
+                lda result+1
+                sbc #0
+                sta result+1
++
+                
+; s->a = (uint8_t)result;
+                lda result+0
+                sta simulated_state.a
+
+; SetNZ(s, s->a);
+                jsr simulate_bcd_cmos_flags
+
+                .simulate_x
+                .simulate_y
+                .simulate_s
+                .simulate_operand
+                
+                rts
+
+al: .fill 2
+result: .fill 2
+                
+                .endproc
+
+;-------------------------------------------------------------------------
+
+simulate_bcd_cmos_flags: .proc
+                lda simulated_state.p
+                and #~(P.N|P.Z)
+                sta simulated_state.p
+
+                lda simulated_state.a
+                bpl got_n
+
+                lda simulated_state.p
+                ora #P.N
+                sta simulated_state.p
+got_n:
+
+                lda simulated_state.a
+                bne got_z
+
+                lda simulated_state.p
+                ora #P.Z
+                sta simulated_state.p
+got_z:
+                rts
+                .endproc
+                
+;-------------------------------------------------------------------------
 
                 .endsection code
                 
