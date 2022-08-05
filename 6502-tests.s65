@@ -468,6 +468,25 @@ cycle_operand_A_C:
 
 ;-------------------------------------------------------------------------
 
+                ; cycles through all A, X
+cycle_A_X:
+                inc input_state.a
+                bne test_one_state_loop
+
+                lda input_state.x
+                eor #$ff
+                jsr progress
+
+                inc input_state.x
+                bne test_one_state_loop
+
+                jsr noise_y
+                jsr noise_s
+
+                jmp instruction_test_done
+
+;-------------------------------------------------------------------------
+
                 ; cycles through all operand, A, C, D.
 cycle_operand_A_C_D:
                 .step_value input_state.a
@@ -641,6 +660,13 @@ tests:
                 .Test exec_rra_aby,Index.y,simulate_rra,cycle_operand_A_C_D,"rra $nnnn,y"
                 .Test exec_rra_inx,Index.x,simulate_rra,cycle_operand_A_C_D,"rra ($nn,x)"
                 .Test exec_rra_iny,Index.y,simulate_rra,cycle_operand_A_C_D,"rra ($nn),y"
+                .endif
+
+                .if should_run_test('sax')
+                .Test exec_sax_zpg,Index.none,simulate_sax,cycle_A_X,"sax $nn"
+                .Test exec_sax_zpy,Index.y,simulate_sax,cycle_A_X,"sax $nn,y"
+                .Test exec_sax_abs,Index.none,simulate_sax,cycle_A_X,"sax $nnnn"
+                .Test exec_sax_inx,Index.none,simulate_sax,cycle_A_X,"sax ($nn,x)" ;Index.none is valid here - special handling for this oddity
                 .endif
                 
                 .if should_run_test('slo')
@@ -1508,6 +1534,52 @@ simulate_usbc: .proc
                 .simulate_y
                 .simulate_s
                 .simulate_operand
+                rts
+                .endproc
+
+;-------------------------------------------------------------------------
+
+exec_sax_zpg: .proc
+                sax output_state.operand
+                jmp exec_done
+                .endproc
+
+exec_sax_zpy: .proc
+                sax output_state.operand,y
+                jmp exec_done
+                .endproc
+
+exec_sax_abs: .proc
+                sax @w output_state.operand
+                jmp exec_done
+                .endproc
+
+exec_sax_inx: .proc
+                php
+
+                ; bit tedious, as the address needs adjusting...
+                stx do_sub+1
+
+                lda #output_operand_ptr
+                sec
+do_sub: sbc #0
+                sta do_sax+1
+                lda input_state.a
+do_sax: sax (0,x)
+                plp
+                jmp exec_done
+                .endproc
+
+simulate_sax: .proc
+                lda input_state.a
+                and input_state.x
+                sta simulated_state.operand
+                
+                .simulate_a
+                .simulate_x
+                .simulate_y
+                .simulate_s
+                .simulate_p 0
                 rts
                 .endproc
                 
