@@ -16,47 +16,48 @@ about 45 minutes).
 
 8 bits of input:
 
-| Name | 64tass  | inputs     | outputs    | notes    |
-|------+---------+------------+------------+----------|
-| LAX  | LAX     | M          | A, X, P    |          |
+| Name | 64tass | inputs | outputs | notes | done |
+|------+--------+--------+---------+-------+------|
+| LAX  | LAX    | M      | A, X, P |       | y    |
 
 16 bits of input:
 
-| Name | 64tass  | inputs     | outputs    | notes    |
-|------+---------+------------+------------+----------|
-| ALR  | ASR     | A, imm     | A, P       |          |
-| ANC  | ANC     | A, imm     | A, P       |          |
-| ANC  | - ($2b) | A, imm     | A, P       |          |
-| DCP  | DCP     | A, M       | M, P       |          |
-| ISC  | ISB     | A, M       | M, P       |          |
-| LAS  | LDS     | M, S       | A, X, S, P |          |
-| SLO  | SLO     | A, M       | A, M, P    |          |
-| SRE  | SRE     | A, M       | A, M, P    |          |
-| USBC | - ($eb) |            |            |          |
+| Name | 64tass  | inputs | outputs    | notes | done |
+|------+---------+--------+------------+-------+------|
+| ALR  | ASR     | A, imm | A, P       |       | y    |
+| ANC  | ANC     | A, imm | A, P       |       | y    |
+| ANC  | - ($2b) | A, imm | A, P       |       | y    |
+| DCP  | DCP     | A, M   | M, P       |       | y    |
+| ISC  | ISB     | A, M   | M, P       |       | y    |
+| LAS  | LDS     | M, S   | A, X, S, P |       | y    |
+| SAX  |         |        |            |       | y    |
+| SLO  | SLO     | A, M   | A, M, P    |       | y    |
+| SRE  | SRE     | A, M   | A, M, P    |       | y    |
+| USBC | - ($eb) |        |            |       | y    |
 
 17 bits of input:
 
-| Name | 64tass  | inputs     | outputs    | notes    |
-|------+---------+------------+------------+----------|
-| ARR  | ARR     | A, imm, C  | A, P       |          |
-| RLA  | RLA     | A, M, C    | A, M, P    |          |
-| RRA  | RRA     | A, M, C    | A, M, P    |          |
+| Name | 64tass | inputs    | outputs | notes | done |
+|------+--------+-----------+---------+-------+------|
+| ARR  | ARR    | A, imm, C | A, P    |       |  y   |
+| RLA  | RLA    | A, M, C   | A, M, P |       |  y   |
+| RRA  | RRA    | A, M, C   | A, M, P |       |  y   |
 
 24 bits of input:
 
-| Name | 64tass  | inputs     | outputs    | notes    |
-|------+---------+------------+------------+----------|
-| SBX  | SBX     | A, X, oper | X, P       |          |
+| Name | 64tass | inputs     | outputs | notes | done |
+|------+--------+------------+---------+-------+------|
+| SBX  | SBX    | A, X, oper | X, P    |       |      |
 
 Unstable (ignore for now):
 
-| Name | 64tass  | inputs     | outputs    | notes    |
-|------+---------+------------+------------+----------|
-| LXA  | LAX #   | imm        | A, X, P    | unstable |
-| SHA  |         |            |            | unstable |
-| SHX  |         |            |            | unstable |
-| SHY  |         |            |            | unstable |
-| ANE  | ANE     | A, X, imm  | A, P       | unstable |
-| TAS  |         |            |            | unstable |
+| Name | 64tass | inputs    | outputs | notes    | done |
+|------+--------+-----------+---------+----------+------|
+| ANE  | ANE    | A, X, imm | A, P    | unstable |      |
+| LXA  | LAX #  | imm       | A, X, P | unstable |      |
+| SHA  |        |           |         | unstable |      |
+| SHX  |        |           |         | unstable |      |
+| SHY  |        |           |         | unstable |      |
+| TAS  |        |           |         | unstable |      |
 
 Ignore the unstable ones for now.
