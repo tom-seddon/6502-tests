@@ -30,8 +30,8 @@ about 45 minutes).
 | DCP  | DCP     | A, M       | M, P       |          |
 | ISC  | ISB     | A, M       | M, P       |          |
 | LAS  | LDS     | M, S       | A, X, S, P |          |
-| SLO  | SLO     | M, A       | A, M, P    |          |
-| SRE  | SRE     | M, A       | A, M, P    |          |
+| SLO  | SLO     | A, M       | A, M, P    |          |
+| SRE  | SRE     | A, M       | A, M, P    |          |
 | USBC | - ($eb) |            |            |          |
 
 17 bits of input:
@@ -39,8 +39,8 @@ about 45 minutes).
 | Name | 64tass  | inputs     | outputs    | notes    |
 |------+---------+------------+------------+----------|
 | ARR  | ARR     | A, imm, C  | A, P       |          |
-| RLA  | RLA     | M, C, A    | A, M, P    |          |
-| RRA  | RRA     | M, C, A    | A, M, P    |          |
+| RLA  | RLA     | A, M, C    | A, M, P    |          |
+| RRA  | RRA     | A, M, C    | A, M, P    |          |
 
 24 bits of input:
 

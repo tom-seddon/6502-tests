@@ -3,6 +3,8 @@
 ;-------------------------------------------------------------------------
 
                 .include "./submodules/beeb/include/beeb.s65"
+
+STEP=$1
                 
 ;-------------------------------------------------------------------------
 
@@ -68,6 +70,17 @@ simulate_p: .macro mask
                 .endif
                 .endmacro
 
+simulate_update_p: .macro mask
+                php
+                lda simulated_state.p
+                and #(\mask)^$ff
+                sta simulated_state.p
+                pla
+                and #\mask
+                ora simulated_state.p
+                sta simulated_state.p
+                .endmacro
+
 simulate_s: .macro
                 lda input_state.s
                 sta simulated_state.s
@@ -92,7 +105,19 @@ simulate_operand: .macro
                 lda input_state.operand
                 sta simulated_state.operand
                 .endmacro
+
+step_value: .macro reg
+                .if STEP==1
+                inc \reg
+                .else
+                clc
+                lda \reg
+                adc #STEP
+                sta \reg
+                .endif
+                .endmacro
                 
+
 ;-------------------------------------------------------------------------
 
 *=0
@@ -132,6 +157,11 @@ index_type: .fill 1
                 ; when bit 7 set, show fancy(ish) progress display.
                 ; Inhibited when *SPOOLing.
 show_progress: .fill 1
+
+                ; Working data for the rather fiddly ARR instruction.
+arr_t: .fill 1
+arr_av: .fill 1
+
                 .endsection zp_bss
 
 ;-------------------------------------------------------------------------
@@ -376,6 +406,8 @@ noise_s:
                 sta input_state.s
                 rts
 
+;-------------------------------------------------------------------------
+
                 ; cycles through all operands  
 cycle_operand:
                 jsr noise_a
@@ -383,15 +415,17 @@ cycle_operand:
                 jsr noise_y
                 jsr noise_s
                 
-                inc input_state.operand
+                .step_value input_state.operand
                 bne test_one_state_loop
                 jmp instruction_test_done
+
+;-------------------------------------------------------------------------
 
                 ; cycles through all operand, A, C. When operand
                 ; changes, overwrites the immediate value in the exec
                 ; routine with it.
 cycle_imm_A_C:
-                inc input_state.a
+                .step_value input_state.a
                 bne test_one_state_loop
                 
                 jsr next_operand_C
@@ -401,13 +435,43 @@ cycle_imm_A_C:
                 sta (exec_routine),y
                 jmp test_one_state_loop
 
+;-------------------------------------------------------------------------
+
+                ; cycles through all operand, A, C. When operand
+                ; changes, overwrites the immediate value in the exec
+                ; routine with it.
+cycle_imm_A_C_D:
+                .step_value input_state.a
+                bne test_one_state_loop
+                
+                jsr next_operand_C_D
+
+                lda input_state.operand
+                ldy #1
+                sta (exec_routine),y
+                jmp test_one_state_loop
+                
+;-------------------------------------------------------------------------
+
                 ; cycles through all operand, A, C.
 cycle_operand_A_C:
-                inc input_state.a
+                .step_value input_state.a
                 bne test_one_state_loop
                 
                 jsr next_operand_C
                 jmp test_one_state_loop
+
+;-------------------------------------------------------------------------
+
+                ; cycles through all operand, A, C, D.
+cycle_operand_A_C_D:
+                .step_value input_state.a
+                bne test_one_state_loop
+
+                jsr next_operand_C_D
+                jmp test_one_state_loop
+                
+;-------------------------------------------------------------------------
 
                 ; select next operand, C. If operand changed, return
                 ; to caller; otherwise, loop or done.
@@ -418,6 +482,7 @@ next_operand_C:
                 lsr a
                 bcs test_one_state_loop
 
+next_operand_with_progress:
                 jsr noise_x
                 jsr noise_y
                 jsr noise_s
@@ -426,12 +491,33 @@ next_operand_C:
                 eor #$ff
                 jsr progress
 
-                inc input_state.operand
+                .step_value input_state.operand
                 beq instruction_test_done
                 rts
 
+;-------------------------------------------------------------------------
+
+                ; select next operand, C, D. If operand changed,
+                ; return to caller; otherwise, loop or done.
+next_operand_C_D:
+                lda input_state.p
+                eor #P.C
+                sta input_state.p
+                and #P.C
+                bne test_one_state_loop
+
+                lda input_state.p
+                eor #P.D
+                sta input_state.p
+                and #P.D
+                bne test_one_state_loop
+
+                jmp next_operand_with_progress
+                
+;-------------------------------------------------------------------------
+
 cycle_operand_S:
-                inc input_state.operand
+                .step_value input_state.operand
                 bne test_one_state_loop
 
                 ; slight pain, as S starts at $ff. Well, at least the
@@ -502,6 +588,24 @@ tests:
 
                 .Test exec_lds_aby,Index.y,simulate_lds,cycle_operand_S,"lds $nnnn,y"
 
+                .Test exec_slo_zpg,Index.none,simulate_slo,cycle_operand_A_C,"slo $nn"
+                .Test exec_slo_zpx,Index.x,simulate_slo,cycle_operand_A_C,"slo $nn,x"
+                .Test exec_slo_abs,Index.none,simulate_slo,cycle_operand_A_C,"slo $nnnn"
+                .Test exec_slo_abx,Index.x,simulate_slo,cycle_operand_A_C,"slo $nnnn,x"
+                .Test exec_slo_aby,Index.y,simulate_slo,cycle_operand_A_C,"slo $nnnn,y"
+                .Test exec_slo_inx,Index.x,simulate_slo,cycle_operand_A_C,"slo ($nn,x)"
+                .Test exec_slo_iny,Index.y,simulate_slo,cycle_operand_A_C,"slo ($nn),y"
+                
+                .Test exec_sre_zpg,Index.none,simulate_sre,cycle_operand_A_C,"sre $nn"
+                .Test exec_sre_zpx,Index.x,simulate_sre,cycle_operand_A_C,"sre $nn,x"
+                .Test exec_sre_abs,Index.none,simulate_sre,cycle_operand_A_C,"sre $nnnn"
+                .Test exec_sre_abx,Index.x,simulate_sre,cycle_operand_A_C,"sre $nnnn,x"
+                .Test exec_sre_aby,Index.y,simulate_sre,cycle_operand_A_C,"sre $nnnn,y"
+                .Test exec_sre_inx,Index.x,simulate_sre,cycle_operand_A_C,"sre ($nn,x)"
+                .Test exec_sre_iny,Index.y,simulate_sre,cycle_operand_A_C,"sre ($nn),y"
+
+                .Test exec_arr_imm,Index.none,simulate_arr,cycle_imm_A_C_D,"arr #$nn"
+             
                 .word 0
 
 ;-------------------------------------------------------------------------
@@ -673,7 +777,6 @@ exec_isb_inx:
 exec_isb_iny:
                 isb (output_operand_ptr),y
                 jmp exec_done
-
 simulate_isb:
                 ldx input_state.operand
                 inx
@@ -703,13 +806,229 @@ simulate_lds:
                 sta simulated_state.x
                 sta simulated_state.s
 
-                ; Looks like P is inconsistent on my Beeb???
+                ; Z flag is inconsistent on my BBC B. N seems
+                ; reliable.
+                asl a           ;C set if N
                 lda output_state.p
+                and #~P.N
+                bcc +
+                ora #P.N
++
                 sta simulated_state.p
 
                 .simulate_y
                 .simulate_operand
                 rts
+
+;-------------------------------------------------------------------------
+
+exec_slo_zpg:
+                slo output_state.operand
+                jmp exec_done
+
+exec_slo_zpx:
+                slo output_state.operand,x
+                jmp exec_done
+
+exec_slo_abs:
+                slo @w output_state.operand
+                jmp exec_done
+
+exec_slo_abx:
+                slo @w output_state.operand,x
+                jmp exec_done
+
+exec_slo_aby:
+                slo @w output_state.operand,y
+                jmp exec_done
+
+exec_slo_inx:
+                slo (output_operand_ptr,x)
+                jmp exec_done
+
+exec_slo_iny:
+                slo (output_operand_ptr),y
+                jmp exec_done
+
+simulate_slo:
+                lda input_state.operand
+                asl a
+                sta simulated_state.operand
+                ora input_state.a
+                sta simulated_state.a
+                
+                .simulate_p P.N|P.Z|P.C
+                .simulate_x
+                .simulate_y
+                .simulate_s
+                rts
+
+;-------------------------------------------------------------------------
+
+exec_sre_zpg:
+                sre output_state.operand
+                jmp exec_done
+
+exec_sre_zpx:
+                sre output_state.operand,x
+                jmp exec_done
+
+exec_sre_abs:
+                sre @w output_state.operand
+                jmp exec_done
+
+exec_sre_abx:
+                sre @w output_state.operand,x
+                jmp exec_done
+
+exec_sre_aby:
+                sre @w output_state.operand,y
+                jmp exec_done
+
+exec_sre_inx:
+                sre (output_operand_ptr,x)
+                jmp exec_done
+
+exec_sre_iny:
+                sre (output_operand_ptr),y
+                jmp exec_done
+
+simulate_sre:
+                lda input_state.operand
+                lsr a
+                sta simulated_state.operand
+                eor input_state.a
+                sta simulated_state.a
+                
+                .simulate_p P.N|P.Z|P.C
+                .simulate_x
+                .simulate_y
+                .simulate_s
+                rts
+
+;-------------------------------------------------------------------------
+
+exec_arr_imm:
+                arr #0
+                jmp exec_done
+
+simulate_arr: .proc
+                .simulate_operand
+                .simulate_x
+                .simulate_y
+                .simulate_s
+                
+                lda input_state.p
+                and #P.D
+                bne bcd
+
+not_bcd: .block
+                lda input_state.p
+                lsr a           ;set up C
+
+                lda input_state.a
+                and input_state.operand ;do the AND
+                ror a                   ;do the ROR
+                sta simulated_state.a
+
+                .simulate_p P.N|P.Z ;set N+Z from the ROR
+
+                ; set C
+                lda simulated_state.p
+                and #~P.C
+                bit simulated_state.a
+                bvc got_c
+                ora #P.C
+got_c:
+                sta simulated_state.p
+
+                ; set V
+                lda simulated_state.a
+                lsr a
+                eor simulated_state.a
+                and #$20
+                cmp #1        ;C=1 if bits 6 and 5 differ
+                lda simulated_state.p
+                and #~P.V
+                bcc got_v
+                ora #P.V
+got_v:
+                sta simulated_state.p
+                rts
+                .endblock
+
+bcd: .block
+                lda input_state.p
+                lsr a           ;set up C
+
+                lda input_state.a
+                and input_state.operand ;do the AND
+                sta arr_t
+                ror a                   ;do the ROR
+                sta simulated_state.a
+
+                .simulate_p P.N|P.Z
+
+                ; set V
+                lda simulated_state.a
+                eor arr_t
+                and #$40
+                cmp #1          ;C=1 if bit 6 set
+                lda simulated_state.p
+                and #~(P.V|P.C) ;clear C while we're here
+                bcc got_v
+                ora #P.V
+got_v:
+                sta simulated_state.p
+
+                lda arr_t
+                lsr a           ;C=al&1
+                lda arr_t
+                and #$0f
+                adc #0          ;al+(al&1)
+                cmp #6
+                bcc done_lower_nybble
+
+                clc
+                lda simulated_state.a ;s->a
+                adc #6                ;s->a+6
+                and #$0f              ;s->a+6&0xf
+                sta arr_av
+
+                lda simulated_state.a ;s->a
+                and #$f0              ;s->a&0xf0
+                ora arr_av            ;s->a&0xf0|s->a+6&0xf
+                sta simulated_state.a
+done_lower_nybble:
+
+                lda arr_t
+                lsr a
+                lsr a
+                lsr a
+                lsr a           ;t>>4
+                sta arr_av
+                lsr a           ;C=t>>4&1
+                lda arr_av          ;t>>4
+                adc #0          ;t>>4+t>>4&1
+                cmp #6          ;C=1 if ah+(ah&1)>5
+                bcc done_higher_nybble
+
+                ; set C
+                lda simulated_state.p
+                ora #P.C
+                sta simulated_state.p
+
+                ; adjustA
+                lda simulated_state.a
+                clc
+                adc #$60
+                sta simulated_state.a
+
+done_higher_nybble:
+                rts
+                .endblock
+
+                .endproc
 
 ;-------------------------------------------------------------------------
 
