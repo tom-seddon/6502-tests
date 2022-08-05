@@ -7,7 +7,7 @@
 STEP=$1
 
                 ; empty list means run all tests.
-tests_to_run=[]
+tests_to_run=['usbc']
 
 should_run_test: .sfunction name,len(tests_to_run)==0||name in tests_to_run
                 
@@ -571,6 +571,10 @@ tests:
 
                 .if should_run_test('sbc_bcd_nmos')
                 .Test exec_sbc_bcd_zpg,Index.none,simulate_sbc_bcd_nmos,cycle_operand_A_C,"sbc $nn (BCD) (NMOS)"
+                .endif
+
+                .if should_run_test('usbc')
+                .Test exec_usbc_imm,Index.none,simulate_usbc,cycle_imm_A_C_D,"usbc #$nn"
                 .endif
                 
                 .if should_run_test('arr')
@@ -1471,6 +1475,40 @@ al=bcd_al
                 .simulate_operand
                 rts
                 
+                .endproc
+
+;-------------------------------------------------------------------------
+
+exec_usbc_imm: .proc
+                .byte $eb,$00
+                jmp exec_done
+                .endproc
+
+simulate_usbc: .proc
+
+                ; Assumes SBC is tested and known to be working...
+
+                lda input_state.p
+                lsr a           ;set up C
+
+                and #P.D>>1
+                beq +
+                sed
++
+
+                lda input_state.a
+                sbc input_state.operand
+                sta simulated_state.a
+
+                cld
+
+                .simulate_p P.N|P.V|P.Z|P.C
+                
+                .simulate_x
+                .simulate_y
+                .simulate_s
+                .simulate_operand
+                rts
                 .endproc
                 
 ;-------------------------------------------------------------------------
