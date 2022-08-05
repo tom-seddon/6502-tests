@@ -583,14 +583,14 @@ tests:
                 .Test exec_dcp_iny,Index.y,simulate_dcp,cycle_operand_A_C,"dcp ($nn),y"
                 .endif
                 
-                .if should_run_test('icb')
-                .Test exec_isb_zpg,Index.none,simulate_isb,cycle_operand_A_C,"isb $nn"
-                .Test exec_isb_zpx,Index.x,simulate_isb,cycle_operand_A_C,"isb $nn,x"
-                .Test exec_isb_abs,Index.none,simulate_isb,cycle_operand_A_C,"isb $nnnn"
-                .Test exec_isb_abx,Index.x,simulate_isb,cycle_operand_A_C,"isb $nnnn,x"
-                .Test exec_isb_aby,Index.y,simulate_isb,cycle_operand_A_C,"isb $nnnn,y"
-                .Test exec_isb_inx,Index.x,simulate_isb,cycle_operand_A_C,"isb ($nn,x)"
-                .Test exec_isb_iny,Index.y,simulate_isb,cycle_operand_A_C,"isb ($nn),y"
+                .if should_run_test('isb')
+                .Test exec_isb_zpg,Index.none,simulate_isb,cycle_operand_A_C_D,"isb $nn"
+                .Test exec_isb_zpx,Index.x,simulate_isb,cycle_operand_A_C_D,"isb $nn,x"
+                .Test exec_isb_abs,Index.none,simulate_isb,cycle_operand_A_C_D,"isb $nnnn"
+                .Test exec_isb_abx,Index.x,simulate_isb,cycle_operand_A_C_D,"isb $nnnn,x"
+                .Test exec_isb_aby,Index.y,simulate_isb,cycle_operand_A_C_D,"isb $nnnn,y"
+                .Test exec_isb_inx,Index.x,simulate_isb,cycle_operand_A_C_D,"isb ($nn,x)"
+                .Test exec_isb_iny,Index.y,simulate_isb,cycle_operand_A_C_D,"isb ($nn),y"
                 .endif
                 
                 .if should_run_test('lax')
@@ -817,21 +817,28 @@ exec_isb_inx:
 exec_isb_iny:
                 isb (output_operand_ptr),y
                 jmp exec_done
-simulate_isb:
+                
+simulate_isb: .proc
                 ldx input_state.operand
                 inx
                 stx simulated_state.operand
                 lda input_state.p
-                lsr a
+                lsr a           ;set up C
+                and #P.D>>1
+                beq +
+                sed
++
                 lda input_state.a
                 sbc simulated_state.operand
                 sta simulated_state.a
+                cld
                 .simulate_p P.N|P.V|P.Z|P.C
 
                 .simulate_x
                 .simulate_y
                 .simulate_s
                 rts
+                .endproc
 
 ;-------------------------------------------------------------------------
 
