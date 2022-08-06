@@ -3,7 +3,8 @@
 ;-------------------------------------------------------------------------
 
                 .include "./submodules/beeb/include/beeb.s65"
-
+                .include "lib.s65"
+                
 STEP=$1
 
                 ; empty list means run all tests.
@@ -128,11 +129,13 @@ step_value: .macro reg
 
 *=$60
                 .dsection zp_bss
+                .dsection zp_lib
                 .cerror *>$90,'zp overflow'
 
                 ; start high to accommodate *SPOOL + ADFS
 *=$2000
                 .dsection code
+                .dsection code_lib
                 .cerror *>$7c00,'code overflow'
                 
 ;-------------------------------------------------------------------------
@@ -153,7 +156,6 @@ simulated_state: .dstruct State
 
                 ; always points to output_state.operand.
 output_operand_ptr: .fill 2
-print_ptr: .fill 2
 old_language_rom: .fill 1
 test_ptr: .fill 2
 any_bad: .fill 1
@@ -686,86 +688,6 @@ p_bits: .text 'CZIDBUVN'
                 
 ;-------------------------------------------------------------------------
 
-print0: .proc
-                pla
-                sta print_ptr+0
-                pla
-                sta print_ptr+1
-
-loop:
-                ldx #print_ptr
-                jsr incz16
-                
-                lda #218        ;items in VDU queue (AUG p221)
-                jsr osbyte_x00_yff
-                
-                ldy #0
-                lda (print_ptr),y
-
-                cpx #0
-                bne print
-
-                cmp #0
-                beq done
-
-print:
-                jsr oswrch
-
-                
-                jmp loop
-
-done:
-                ldx #print_ptr
-                jsr incz16
-                jmp (print_ptr)
-                
-                .endproc   
-
-;-------------------------------------------------------------------------
-
-incz16:
-                inc 0,x
-                bne +
-                inc 1,x
-+
-                rts
-                
-;-------------------------------------------------------------------------
-
-osbyte_x00_yff:
-                ldx #$00
-                ldy #$ff
-                jmp osbyte
-                
-;-------------------------------------------------------------------------
-
-get_hi_nybble_ascii:
-                lsr a
-                lsr a
-                lsr a
-                lsr a
-get_lo_nybble_ascii:
-                and #$0f
-                sed
-                clc
-                adc #$90
-                adc #$40
-                cld
-                rts
-
-print_hex:
-                pha
-                pha
-                jsr get_hi_nybble_ascii
-                jsr oswrch
-                pla
-                jsr get_lo_nybble_ascii
-                jsr oswrch
-                pla
-                rts
-                
-;-------------------------------------------------------------------------
-                
 nmos_tests:
                 .if should_run_test('adc_bcd_nmos')
                 .Test exec_adc_bcd_zpg,Index.none,simulate_adc_bcd_nmos,cycle_operand_A_C,"adc $nn (BCD) (NMOS)"
