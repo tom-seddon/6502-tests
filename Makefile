@@ -15,6 +15,10 @@ all:
 
 	$(TASS) --case-sensitive --long-branch --m65xx --cbm-prg -L "$(BUILD)/6502-tests.lst" -o "$(BUILD)/6502-tests.prg" "6502-tests.s65"
 	$(PYTHON3) submodules/beeb/bin/prg2bbc.py "$(BUILD)/6502-tests.prg" "$(BEEB_BUILD)/$$.TESTS"
+
+	$(TASS) --case-sensitive --long-branch --m6502 --cbm-prg -L "$(BUILD)/6502-consistency-tests.lst" -o "$(BUILD)/6502-consistency-tests.prg" "6502-consistency-tests.s65"
+	$(PYTHON3) submodules/beeb/bin/prg2bbc.py "$(BUILD)/6502-consistency-tests.prg" "$(BEEB_BUILD)/$$.CONS"
+
 	$(PYTHON3) submodules/beeb/bin/ssd_create.py -b '*RUN TESTS' -o "$(BUILD)/6502-tests.ssd" "$(BEEB_BUILD)/$$.TESTS"
 
 ##########################################################################

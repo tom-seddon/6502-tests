@@ -1,0 +1,355 @@
+                .include "./submodules/beeb/include/beeb.s65"
+                .include "lib.s65"
+
+;-------------------------------------------------------------------------
+
+*=$60
+zp_bss_start:
+                .dsection zp_bss
+zp_bss_end:
+                .dsection zp_lib
+                .cerror *>$90,'zp overflow'
+
+                ; start high to accommodate BASIC driver (can also be
+                ; *RUN in Mode 7)
+*=$4000
+                .dsection code
+                .dsection code_lib
+                .cerror *>$7c00,'code overflow'
+
+;-------------------------------------------------------------------------
+
+                .section zp_bss
+old_language_rom: .fill 1
+state_begin:
+input_a: .fill 1
+input_x: .fill 1
+input_y: .fill 1
+input_s: .fill 1
+input_p: .fill 1
+input_operand: .fill 1
+operand: .fill 1
+                ; order must match the names string
+crcs_begin:
+crc_a: .fill 2
+crc_x: .fill 2
+crc_y: .fill 2
+crc_s: .fill 2
+crc_operand: .fill 2
+crc_n: .fill 2
+crc_v: .fill 2
+crc_u: .fill 2
+crc_b: .fill 2
+crc_d: .fill 2
+crc_i: .fill 2
+crc_z: .fill 2
+crc_c: .fill 2
+crcs_end:
+buf_n: .fill 1
+buf_v: .fill 1
+buf_u: .fill 1
+buf_b: .fill 1
+buf_d: .fill 1
+buf_i: .fill 1
+buf_z: .fill 1
+buf_c: .fill 1
+state_end:
+                .endsection zp_bss
+
+;-------------------------------------------------------------------------
+
+CRCByte: .macro addr
+                eor \addr+1
+                .rept 8
+                .block
+                asl \addr+0
+                rol a
+                bcc clear
+                sta reload_a+1;tay
+                lda \addr+0
+                eor #$21
+                sta \addr+0
+reload_a: lda #$ff;tya
+                eor #$10
+clear:
+                .endblock
+                .endrept
+                sta \addr+1
+                .endmacro
+                
+;-------------------------------------------------------------------------
+
+                .section code
+                lda $fffe
+                sta $fffe
+                jsr is_65c02
+                bcc +
+                brk
+                .text 255,'Requires NMOS 6502',0
++
+
+                lda #252        ;current language ROM (AUG p243)
+                jsr osbyte_x00_yff
+                stx old_language_rom
+
+                jsr print0
+                .text 22,7
+                .text 31,0,1
+                .text "A  X  Y  S  O  N  V  U  B  D  I  Z  C"
+                .text 0
+
+test:            
+                jsr window
+                jsr reset_state
+loop:
+                lda input_operand
+                sta operand
+                ldx input_s
+                txs
+                lda input_p
+                pha
+                lda input_a
+                ldx input_x
+                ldy input_y
+                plp
+                
+                las operand,y
+
+                php
+
+                #CRCByte crc_a
+                
+                pla             ;restore P
+                asl a
+                rol buf_n
+                asl a
+                rol buf_v
+                asl a
+                rol buf_u
+                asl a
+                rol buf_b
+                asl a
+                rol buf_d
+                asl a
+                rol buf_i
+                asl a
+                rol buf_z
+                asl a
+                rol buf_c
+                bcc p_buf_done
+
+                lda buf_n
+                #CRCByte crc_n
+                lda buf_v
+                #CRCByte crc_v
+                lda buf_u
+                #CRCByte crc_u
+                lda buf_b
+                #CRCByte crc_b
+                lda buf_d
+                #CRCByte crc_d
+                lda buf_i
+                #CRCByte crc_i
+                lda buf_z
+                #CRCByte crc_z
+                lda buf_c
+                #CRCByte crc_c
+
+                lda #1
+                sta buf_c
+
+p_buf_done:
+
+                txa
+                #CRCByte crc_x
+                tya
+                #CRCByte crc_y
+                tsx
+                txa
+                #CRCByte crc_s
+                lda operand
+                #CRCByte crc_operand
+
+                inc input_operand
+                bne loop
+
+                ; oswrch does a bunch of lda $103,x (etc.), which
+                ; doesn't work if the stack wraps...
+                ldx #$ff
+                txs
+
+                bit $ff
+                bmi exit
+                
+                lda input_s
+                eor #$ff
+                jsr print_hex
+                lda #8
+                jsr oswrch
+                jsr oswrch
+                ldx input_s
+                inx
+                stx input_s
+                cpx #$ff
+                bne loop
+
+                jsr print_crcs
+                jsr compare_crcs
+                
+                jmp test
+
+exit:
+                lda #142        ;enter language ROM (AUG p166)
+                ldx old_language_rom
+                jmp osbyte
+
+;-------------------------------------------------------------------------
+
+reset_state:
+                ldx #state_end-state_begin
+                lda #0
+-
+                sta state_begin,x
+                dex
+                bpl -
+
+                lda #1
+                sta buf_c
+
+                lda #$ff
+                sta input_s
+
+                clc
+                clv
+                cld
+                cli
+                lda #0
+                php
+                pla
+                sta input_p
+                rts
+
+;-------------------------------------------------------------------------
+
+window: .proc
+                jsr print0
+                .text 28,0,24,39,2
+                .text 0
+                rts
+                .endproc
+                
+;-------------------------------------------------------------------------
+
+print_base64: .proc
+                and #63
+                tay
+                lda base64_table,y
+                jsr oswrch
+                rts
+
+base64_table: .text 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+                .cerror size(base64_table)!=64,''
+                
+                .endproc
+                
+;-------------------------------------------------------------------------
+
+print_crcs: .proc
+                ldx #crcs_begin
+loop:
+                ; %ccccbbbb bbaaaaaa -> abc
+                ;  76543210 76543210
+                lda 0,x
+                jsr print_base64
+                lda 0,x         ;? bbaaaaaa
+                asl a           ;b baaaaaa0
+                rol a           ;b aaaaaa0b
+                rol a           ;a aaaaa0bb
+                and #3          ;a 000000bb
+                sta ora_value+1
+                lda 1,x         ;ccccbbbb
+                asl a           ;cccbbbb0
+                asl a           ;ccbbbb00
+ora_value: ora #$ff             ;ccbbbbbb
+                jsr print_base64
+                lda 1,x         ;ccccbbbb
+                lsr a           ;0ccccbbb
+                lsr a           ;00ccccbb
+                lsr a           ;000ccccb
+                lsr a           ;0000cccc
+                jsr print_base64
+                
+                inx
+                inx
+                cpx #crcs_end
+                bne loop
+                jsr osnewl
+                rts
+                .endproc
+
+;-------------------------------------------------------------------------
+
+compare_crcs: .proc
+                ldx #0
+                ldy #0
+loop:
+                lda crcs_begin,x
+                bit got_previous_crcs
+                bpl update_previous_crcs
+                cmp previous_crcs,x
+                beq update_previous_crcs
+                ldy #1          ;different
+update_previous_crcs:
+                sta previous_crcs,x
+                inx
+                cpx #crcs_end-crcs_begin
+                bne loop
+                lda #$80
+                sta got_previous_crcs
+                cpy #0
+                beq done
+
+                inc inconsistent_count+0
+                bne +
+                inc inconsistent_count+1
++
+
+                lda #134        ;read text cursor position (AUG p158)
+                jsr osbyte
+                tya
+                pha             ;save Y coordinate
+                txa
+                pha             ;save X coordinate
+                
+                jsr print0
+                .text 26        ;restore default windows
+                .text 30        ;home
+                .text "Inconsistent: "
+                .text 0
+
+                lda inconsistent_count+1
+                jsr print_hex
+                lda inconsistent_count+0
+                jsr print_hex
+
+                jsr window
+
+                lda #31         ;set text cursor position
+                jsr oswrch
+                pla             ;restore X coordinate
+                jsr oswrch
+                pla             ;restore Y coordinate
+                jsr oswrch
+                
+done:
+                rts
+
+                .endproc
+                
+;-------------------------------------------------------------------------
+
+got_previous_crcs: .byte 0
+inconsistent_count: .word 0
+previous_crcs: .fill crcs_end-crcs_begin
+                
+                .endsection code
