@@ -3,6 +3,8 @@
 
 ;-------------------------------------------------------------------------
 
+; as far is I can tell, BBC BASIC doesn't actually use zp past $4f. So
+; starting at $60 should be fairly safe.
 *=$60
 zp_bss_start:
                 .dsection zp_bss
@@ -20,7 +22,6 @@ zp_bss_end:
 ;-------------------------------------------------------------------------
 
                 .section zp_bss
-old_language_rom: .fill 1
 state_begin:
 input_a: .fill 1
 input_x: .fill 1
@@ -29,8 +30,8 @@ input_s: .fill 1
 input_p: .fill 1
 input_operand: .fill 1
 operand: .fill 1
-                ; order must match the names string
 crcs_begin:
+                ; order must match the names text
 crc_a: .fill 2
 crc_x: .fill 2
 crc_y: .fill 2
@@ -45,6 +46,8 @@ crc_i: .fill 2
 crc_z: .fill 2
 crc_c: .fill 2
 crcs_end:
+                .cerror (crcs_end-crcs_begin)%2!=0,""
+num_crcs=(crcs_end-crcs_begin)/2
 buf_n: .fill 1
 buf_v: .fill 1
 buf_u: .fill 1
@@ -80,6 +83,26 @@ clear:
 ;-------------------------------------------------------------------------
 
                 .section code
+                rts
+
+                ; INF%!0 - routine to call to check CPU
+                .dword check_cpu
+
+                ; INF%?4 - number of CRCs recorded
+                .byte num_crcs
+
+                ; $(INF%!5) - names of CRCs
+                .dword names
+
+                ; INF%!9 - address of CRCs once test has run
+                .dword crcs_begin
+
+                ; INF%!13 - test routine
+                .dword test
+
+;-------------------------------------------------------------------------
+
+check_cpu:
                 lda $fffe
                 sta $fffe
                 jsr is_65c02
@@ -87,20 +110,44 @@ clear:
                 brk
                 .text 255,'Requires NMOS 6502',0
 +
+                rts
+                
+;-------------------------------------------------------------------------
 
-                lda #252        ;current language ROM (AUG p243)
-                jsr osbyte_x00_yff
-                stx old_language_rom
+test:
+                sei
+                tsx
+                stx old_s
+                ldx #0
+-
+                lda $0100,x
+                sta old_stack,x
+                inx
+                bne -
+                cli
+                
+                ldx #state_end-state_begin
+                lda #0
+-
+                sta state_begin,x
+                dex
+                bpl -
 
-                jsr print0
-                .text 22,7
-                .text 31,0,1
-                .text "A  X  Y  S  O  N  V  U  B  D  I  Z  C"
-                .text 0
+                lda #1
+                sta buf_c
 
-test:            
-                jsr window
-                jsr reset_state
+                lda #$ff
+                sta input_s
+
+                clc
+                clv
+                cld
+                cli
+                lda #0
+                php
+                pla
+                sta input_p
+                
 loop:
                 lda input_operand
                 sta operand
@@ -193,163 +240,64 @@ p_buf_done:
                 cpx #$ff
                 bne loop
 
-                jsr print_crcs
-                jsr compare_crcs
-                
-                jmp test
-
 exit:
-                lda #142        ;enter language ROM (AUG p166)
-                ldx old_language_rom
-                jmp osbyte
-
-;-------------------------------------------------------------------------
-
-reset_state:
-                ldx #state_end-state_begin
-                lda #0
--
-                sta state_begin,x
-                dex
-                bpl -
-
-                lda #1
-                sta buf_c
-
-                lda #$ff
-                sta input_s
-
-                clc
-                clv
-                cld
-                cli
-                lda #0
-                php
-                pla
-                sta input_p
-                rts
-
-;-------------------------------------------------------------------------
-
-window: .proc
-                jsr print0
-                .text 28,0,24,39,2
-                .text 0
-                rts
-                .endproc
-                
-;-------------------------------------------------------------------------
-
-print_base64: .proc
-                and #63
-                tay
-                lda base64_table,y
-                jsr oswrch
-                rts
-
-base64_table: .text 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-                .cerror size(base64_table)!=64,''
-                
-                .endproc
-                
-;-------------------------------------------------------------------------
-
-print_crcs: .proc
-                ldx #crcs_begin
-loop:
-                ; %ccccbbbb bbaaaaaa -> abc
-                ;  76543210 76543210
-                lda 0,x
-                jsr print_base64
-                lda 0,x         ;? bbaaaaaa
-                asl a           ;b baaaaaa0
-                rol a           ;b aaaaaa0b
-                rol a           ;a aaaaa0bb
-                and #3          ;a 000000bb
-                sta ora_value+1
-                lda 1,x         ;ccccbbbb
-                asl a           ;cccbbbb0
-                asl a           ;ccbbbb00
-ora_value: ora #$ff             ;ccbbbbbb
-                jsr print_base64
-                lda 1,x         ;ccccbbbb
-                lsr a           ;0ccccbbb
-                lsr a           ;00ccccbb
-                lsr a           ;000ccccb
-                lsr a           ;0000cccc
-                jsr print_base64
-                
-                inx
-                inx
-                cpx #crcs_end
-                bne loop
-                jsr osnewl
-                rts
-                .endproc
-
-;-------------------------------------------------------------------------
-
-compare_crcs: .proc
+                sei
                 ldx #0
-                ldy #0
-loop:
-                lda crcs_begin,x
-                bit got_previous_crcs
-                bpl update_previous_crcs
-                cmp previous_crcs,x
-                beq update_previous_crcs
-                ldy #1          ;different
-update_previous_crcs:
-                sta previous_crcs,x
+-
+                lda old_stack,x
+                sta $0100,x
                 inx
-                cpx #crcs_end-crcs_begin
-                bne loop
-                lda #$80
-                sta got_previous_crcs
-                cpy #0
-                beq done
-
-                inc inconsistent_count+0
-                bne +
-                inc inconsistent_count+1
-+
-
-                lda #134        ;read text cursor position (AUG p158)
-                jsr osbyte
-                tya
-                pha             ;save Y coordinate
-                txa
-                pha             ;save X coordinate
+                bne -
+                ldx old_s
+                txs
+                cli
                 
-                jsr print0
-                .text 26        ;restore default windows
-                .text 30        ;home
-                .text "Inconsistent: "
-                .text 0
-
-                lda inconsistent_count+1
-                jsr print_hex
-                lda inconsistent_count+0
-                jsr print_hex
-
-                jsr window
-
-                lda #31         ;set text cursor position
-                jsr oswrch
-                pla             ;restore X coordinate
-                jsr oswrch
-                pla             ;restore Y coordinate
-                jsr oswrch
-                
-done:
                 rts
 
-                .endproc
+;                 ldx #0
+; compare_crcs_loop:
+;                 bit got_previous_crcs
+;                 bpl update_previous_crcs
+
+;                 lda crcs_begin+0,x
+;                 cmp previous_crcs+0,x
+;                 bne crcs_differ
+;                 lda crcs_begin+1,x
+;                 cmp previous_crcs+1,x
+;                 beq update_previous_crcs
+
+; crcs_differ:
+;                 inc inconsistency_counters+0,x
+;                 bne +
+;                 inc inconsistency_counters+1,x
+; +
+
+; update_previous_crcs:
+;                 lda crcs_begin+0,x
+;                 sta previous_crcs+0,x
+;                 lda crcs_begin+1,x
+;                 sta previous_crcs+1,x
+
+;                 inx
+;                 inx
+;                 cpx #crcs_end-crcs_begin
+;                 bne compare_crcs_loop
+
+;                 lda #$80
+;                 sta got_previous_crcs
+                
+;                 jmp test
+
+names: .text "AXYSONVUBDIZC"
+                .cerror size(names)!=num_crcs,""
+                .byte 13
                 
 ;-------------------------------------------------------------------------
 
-got_previous_crcs: .byte 0
-inconsistent_count: .word 0
-previous_crcs: .fill crcs_end-crcs_begin
+old_stack: .fill 256
+old_s: .fill 1
+                
+;-------------------------------------------------------------------------
+
                 
                 .endsection code
