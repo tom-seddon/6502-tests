@@ -85,21 +85,11 @@ clear:
                 .section code
                 rts
 
-                ; INF%!0 - routine to call to check CPU
-                .dword check_cpu
+                ; code!1 - address of info block
+                .word inf
 
-                ; INF%?4 - number of CRCs recorded
-                .byte num_crcs
-
-                ; $(INF%!5) - names of CRCs
-                .dword names
-
-                ; INF%!9 - address of CRCs once test has run
-                .dword crcs_begin
-
-                ; INF%!13 - test routine
-                .dword test
-
+test_list:=[]
+                
 ;-------------------------------------------------------------------------
 
 check_cpu:
@@ -112,6 +102,122 @@ check_cpu:
 +
                 rts
                 
+;-------------------------------------------------------------------------
+
+progress:
+                bit $ff
+                bmi exit
+                
+                jsr print_hex
+                lda #8
+                jsr oswrch
+                jmp oswrch
+                
+;-------------------------------------------------------------------------
+
+exec_las:
+                las operand,y
+                jmp exec_done
+
+cycle_operand_S:
+                inc input_operand
+                bne loop
+
+                ; oswrch does a bunch of lda $103,x (etc.), which
+                ; doesn't work if the stack wraps...
+                ldx #$ff
+                txs
+
+                lda input_s
+                tax
+                eor #$ff
+                jsr progress
+                inx
+                stx input_s
+                cpx #$ff
+                bne loop
+                jmp exit
+
+test_list..=[(exec_las,cycle_operand_S,"las $nnnn,y")]
+
+;-------------------------------------------------------------------------
+
+exec_ane_Aff: .proc
+                lda input_operand
+                sta l+1
+                lda #$ff
+l: ane #$ff
+                jmp exec_done
+                .endproc
+                
+exec_ane_o00:
+                ane #$00
+                jmp exec_done
+
+cycle_operand_X:
+                inc input_operand
+                bne loop
+
+cycle_X:
+                ldx input_x
+                txa
+                eor #$ff
+                jsr progress
+                inx
+                stx input_x
+                bne loop
+                jmp exit
+
+cycle_A_X:
+                inc input_a
+                bne loop
+
+                jmp cycle_X
+
+                ; test the two cases that are reportedly consistent on
+                ; C64
+test_list..=[(exec_ane_Aff,cycle_operand_X,"ane #$nn (A=$ff)")]
+test_list..=[(exec_ane_o00,cycle_A_X,"ane #$00")]
+
+;-------------------------------------------------------------------------
+
+exec_lax_imm: .proc
+                ldx input_operand
+                stx l+1
+l: lax #$ff
+                jmp exec_done
+                .endproc
+
+cycle_operand_A:
+                inc input_operand
+                bne loop
+                
+                ldx input_a
+                txa
+                eor #$ff
+                jsr progress
+                inx
+                stx input_a
+                bne loop
+                jmp exit
+
+test_list..=[(exec_lax_imm,cycle_operand_A,"lax #$nn")]
+
+cycle_A:
+                inc input_a
+                bne loop
+                jmp exit
+
+exec_lax_ns: .bfor i=0,i<8,i+=1
+value=255>>i
+                lax #value
+                jmp exec_done
+                .endfor
+
+                .for i=0,i<len(exec_lax_ns),i+=1
+test_list..=[(exec_lax_ns[i],cycle_A,"lax #$xx ("..format("%d",i)..")")]
+                .endfor
+
 ;-------------------------------------------------------------------------
 
 test:
@@ -159,8 +265,10 @@ loop:
                 ldx input_x
                 ldy input_y
                 plp
-                
-                las operand,y
+
+exec:
+                jmp exec
+exec_done:
 
                 php
 
@@ -217,28 +325,8 @@ p_buf_done:
                 lda operand
                 #CRCByte crc_operand
 
-                inc input_operand
-                bne loop
-
-                ; oswrch does a bunch of lda $103,x (etc.), which
-                ; doesn't work if the stack wraps...
-                ldx #$ff
-                txs
-
-                bit $ff
-                bmi exit
-                
-                lda input_s
-                eor #$ff
-                jsr print_hex
-                lda #8
-                jsr oswrch
-                jsr oswrch
-                ldx input_s
-                inx
-                stx input_s
-                cpx #$ff
-                bne loop
+cycle:
+                jmp cycle
 
 exit:
                 sei
@@ -288,15 +376,58 @@ exit:
                 
 ;                 jmp test
 
-names: .text "AXYSONVUBDIZC"
+names: .text "AXYSoNVUBDIZC"
                 .cerror size(names)!=num_crcs,""
                 .byte 13
+
+inf:
+                ; inf!0 - routine to call to check CPU
+                .word check_cpu
+
+                ; inf%?2 - number of CRCs recorded
+                .byte num_crcs
+
+                ; $(inf%!3) - names of CRCs
+                .word names
+
+                ; inf%!5 - address of CRCs once test has run
+                .word crcs_begin
+
+                ; inf!7 - test routine
+                .word test
+
+                ; inf?9 - number of tests
+                .byte len(test_list)
+
+                ; inf!10 - test array
+                .word test_list_array
+
+                ; inf!12 - exec routine address
+                .word exec+1
+
+                ; inf!14 - update routine address
+                .word cycle+1
+
+test_name_addrs:=[]
+test_name_array:
+                .for i=0,i<len(test_list),i+=1
+test_name_addrs..=[*]
+                .text test_list[i][2],13
+                .endfor
+
+test_list_array:
+                .for i=0,i<len(test_list),i+=1
+                .word test_list[i][0] ;exec routine
+                .word test_list[i][1] ;update routine
+                .word test_name_addrs[i] ;name
+                .endfor
+
                 
 ;-------------------------------------------------------------------------
 
 old_stack: .fill 256
 old_s: .fill 1
-                
+
 ;-------------------------------------------------------------------------
 
                 
