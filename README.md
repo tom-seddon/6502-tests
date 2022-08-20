@@ -30,8 +30,11 @@ systems only.
 
 # running the tests
 
-Look in `releases` folder, download ssd file with newest date, run on
-BBC or emulator with Shift+Break.
+1. Look in `releases` folder
+2. Use ssd file with newest date (Note if downloading from the GitHub
+   site: don't do right click/Save as. Click the file, producing a
+   mostly useless file info page, and use the Download button)
+3. Run on BBC or emulator with Shift+Break
 
 There's two versions of the tests: one for the NMOS 6502 (BBC B; BBC
 B+; Electron), and one for the CMOS 65c02 (BBC Master series;
