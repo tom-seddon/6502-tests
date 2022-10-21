@@ -35,7 +35,7 @@ Test: .macro exec,index,simulate,next,name
                 .byte \index
                 .word \simulate
                 .word \next
-                .shiftl \name
+                .text \name,0
                 .endmacro
                 
 ;-------------------------------------------------------------------------
@@ -267,11 +267,11 @@ run_instruction_test_loop:
 -
                 lda (test_ptr),y
                 iny
-                lsr a
-                php
+                cmp #0
+                beq +
                 jsr oswrch
-                plp
-                bcc -
+                jmp -
++
 
                 clc
                 tya
