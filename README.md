@@ -24,7 +24,12 @@ consistent on my BBC B too.
 
 This test suite may become more comprehensive over time.
 
-# running the tests on a BBC Micro
+For any comments or feedback, raise a GitHub issue
+(https://github.com/tom-seddon/6502-tests/issues) or post on this
+project's Stardot thread
+(https://stardot.org.uk/forums/viewtopic.php?p=368026#p368026).
+
+# running the tests on a BBC Micro (or emulator)
 
 1. Look in `releases` folder
 2. Use ssd file with newest date (Note if downloading from the GitHub
@@ -37,23 +42,35 @@ B+; Electron), and one for the CMOS 65c02 (BBC Master series;
 virtually all 6502 second processors). The tests auto-detect the CPU
 and will run the appropriate set.
 
-If an error is found, you'll get output along these lines:
+If you run the tests on real hardware, you should get no errors.
+(Please raise a GitHub issue or post in the Stardot thread if you find
+otherwise!)
+
+If you run on an emulator, you may get an error, indicating that the
+emulator isn't emulating the 6502 quite right. For each failing case,
+you'll get test state output along these lines:
 
     I: O=7F A=00 X=00 Y=00 S=80 nvUBdiZc
     o: O=7F A=00 X=00 Y=00 S=00 nvUBdizc
     s: O=7F A=00 X=00 Y=00 S=00 nvUBdiZc
 
-`I` is the input state, `o` the output state, and `s` the expected
-simulated state.
+`I` is the input state: register/operand values before executing the
+instruction. (`O` is the operand value, `A`/`X`/`Y`/`S` are the 6502
+registers, and then the status register bits: upper case letter for
+bits set, lower case for bits reset.)
 
-The tests are not currently very automation-friendly, but this will
-improve. 
+`o` is the output state: register/operand values after having the 6502
+execute the instruction.
+
+`s` is the simulated state: register/operand values after having the
+6502 simulate the instruction's expected behaviour using documented
+instructions only.
 
 # running the tests on some other system
 
 You can modify the source code as required, and build for the target
-of interest. Note how the TARGET variable is set in the Makefile and
-used by the code. The Acorn target would serve as an example.
+of interest. Note how `TARGET` is set in the Makefile and used by the
+code. The Acorn target would serve as an example.
 
 Alternatively, the generic version of the test can be runtime patched.
 Look in the `releases` folder and find the `6502-tests-generic` file
@@ -92,8 +109,9 @@ The test state consists of 3 state structs: input state, output state
 the 6502 simulate the test). Each state struct is 6 bytes: A, X, Y, S,
 P and operand, 1 byte each.
 
-Return with carry set to have the test state printed, or carry clear
-to have it fail silently.
+Return with carry set to have the test state printed (see above), or
+carry clear to have it fail silently (e.g., if you're going to store
+the test data somewhere for later retrieval).
 
 Default callback does `sec:rts`.
 
