@@ -2,7 +2,10 @@
 
 ;-------------------------------------------------------------------------
 
+                .if TARGET=="acorn"
                 .include "./submodules/beeb/include/beeb.s65"
+                .endif
+                
                 .include "lib.s65"
                 
 STEP=$1
@@ -156,7 +159,6 @@ simulated_state: .dstruct State
 
                 ; always points to output_state.operand.
 output_operand_ptr: .fill 2
-old_language_rom: .fill 1
 test_ptr: .fill 2
 any_bad: .fill 1
 exec_routine: .fill 2
@@ -178,22 +180,48 @@ is_cmos: .fill 1
 
                 .section code
 
-                lda $fffe
-                sta $fffe
-                
-                .cpu '65c02'
-                ldx #$ff
-                phx             ;1-byte NOP on NMOS
-                inx
-                plx             ;1-byte NOP on NMOS
-                ; X=$00 on NMOS, X=$ff on CMOS
-                .cpu 'default'
+;-------------------------------------------------------------------------
 
-                stx is_cmos
+start_tests:
+                jmp start
+                .cerror *-start_tests!=3,""
 
-                lda #$80
-                sta show_progress
+                .if TARGET=="generic"
                 
+start_callback:
+                rts
+                .fill 7
+                .cerror *-start_callback!=8,""
+test_begin_callback:
+                sec
+                rts
+                .fill 6
+                .cerror *-test_begin_callback!=8,""
+test_fail_callback:
+                sec
+                rts
+                .fill 6
+                .cerror *-test_fail_callback!=8,""
+test_pass_callback:
+                rts
+                .fill 7
+                .cerror *-test_pass_callback!=8,""
+test_end_callback:
+                rts
+                .fill 7
+                .cerror *-test_end_callback!=8,""
+finish_callback:
+                jmp finish_callback
+                .fill 5
+                .cerror *-finish_callback!=8,""
+print_char:
+                rts
+                .fill 7
+                .cerror *-print_char!=8,""
+                
+                .elsif TARGET=="acorn"
+
+start_callback:
                 lda #199        ;read *SPOOL file handle (AUG p204)
                 jsr osbyte_x00_yff
                 cpx #0
@@ -204,7 +232,52 @@ is_cmos: .fill 1
                 lda #252        ;current language ROM (AUG p243)
                 jsr osbyte_x00_yff
                 stx old_language_rom
+                rts
 
+osbyte_x00_yff:
+                ldx #$00
+                ldy #$ff
+                jmp osbyte
+
+test_begin_callback:
+test_fail_callback:
+                sec
+test_end_callback:
+test_pass_callback:
+                rts
+
+print_char:
+                jmp oswrch
+
+finish_callback:
+                lda #142        ;enter language ROM (AUG p166)
+                ldx old_language_rom
+                jmp osbyte
+
+old_language_rom: .fill 1
+                .else
+
+                .error "unknown build target"
+
+                .endif
+                
+;-------------------------------------------------------------------------
+
+start:
+                lda $fffe
+                sta $fffe
+
+                ldx #$ff
+                txs
+
+                jsr is_65c02
+                stx is_cmos
+                
+                lda #$80
+                sta show_progress
+
+                jsr start_callback
+                
                 bit is_cmos
                 bpl prepare_nmos_tests
 
@@ -263,13 +336,34 @@ run_instruction_test_loop:
                 iny
                 sta jmp_next_state+2
 
+                ; call callback, since the address of the name is to
+                ; hand
+                tya
+                pha
+
+                clc
+                tya
+                adc test_ptr+0
+                tax
+
+                lda test_ptr+1
+                adc #0
+                tay
+
+                jsr test_begin_callback
+
+                pla
+                tay
+
+                php
+
                 ; print name
 -
                 lda (test_ptr),y
                 iny
                 cmp #0
                 beq +
-                jsr oswrch
+                jsr print_char
                 jmp -
 +
 
@@ -280,6 +374,9 @@ run_instruction_test_loop:
                 bcc +
                 inc test_ptr+1
 +
+
+                plp
+                bcc skip_test
 
                 ; initialise output_operand_ptr
                 lda #<output_state.operand
@@ -364,11 +461,19 @@ jmp_next_state:
 bad:
                 bit any_bad
                 bmi +
-                jsr osnewl
+
+                jsr print_crlf
+                
 +
                 lda #$80
                 sta any_bad
+
+                ldx #<input_state
+                ldy #>input_state
+                jsr test_fail_callback
+                
                 jsr print_states
++
                 jmp jmp_next_state
                 ; ...
 
@@ -377,18 +482,49 @@ instruction_test_done:
                 sta $ffff
 
                 bit any_bad
-                bmi +
+                bmi test_end
 
-                jsr print0
-                .text " - ok",10,13,0
-+
+                jsr test_pass_callback
+                
+                ldx #messages.ok
+                jsr print_message
+                
+test_end:
+                jsr test_end_callback
 
                 jmp run_instruction_test_loop
 
-all_tests_done:                
-                lda #142        ;enter language ROM (AUG p166)
-                ldx old_language_rom
-                jmp osbyte
+skip_test:
+                ldx #messages.skipped
+                jsr print_message
+
+                jmp run_instruction_test_loop
+
+all_tests_done:
+                jmp finish_callback
+
+messages: .block
+ok=*-messages
+                .text " - ok",10,13,0
+skipped=*-messages
+                .text " - skipped",10,13,0
+                .endblock
+
+print_message: .proc
+                lda messages,x
+                beq done
+                jsr print_char
+                inx
+                bne print_message
+done:
+                rts
+                .endproc
+
+print_crlf:
+                lda #13
+                jsr print_char
+                lda #10
+                jmp print_char
 
 ;-------------------------------------------------------------------------
 
@@ -593,13 +729,13 @@ progress: .proc
                 
                 pha
                 lda #' '
-                jsr oswrch
+                jsr print_char
                 pla
                 jsr get_hi_nybble_ascii
-                jsr oswrch
+                jsr print_char
                 lda #8
-                jsr oswrch
-                jsr oswrch
+                jsr print_char
+                jsr print_char
 done:
                 rts
                 .endproc
@@ -622,10 +758,10 @@ print_states: .proc
                 rts
 
 print_state:
-                jsr oswrch
+                jsr print_char
 
                 lda #':'
-                jsr oswrch
+                jsr print_char
                 
                 lda State.operand,x
                 ldy #'O'
@@ -648,7 +784,7 @@ print_state:
                 jsr reg
 
                 lda #' '
-                jsr oswrch
+                jsr print_char
 
                 lda State.p,x
                 ldy #7
@@ -659,12 +795,12 @@ print_state:
                 bcs +
                 ora #$20
 +
-                jsr oswrch
+                jsr print_char
                 pla
                 dey
                 bpl -
 
-                jsr osnewl
+                jsr print_crlf
 
                 bit $ff
                 bmi all_tests_done
@@ -674,11 +810,11 @@ print_state:
 reg:
                 pha
                 lda #' '
-                jsr oswrch
+                jsr print_char
                 tya
-                jsr oswrch
+                jsr print_char
                 lda #'='
-                jsr oswrch
+                jsr print_char
                 pla
                 jmp print_hex
                 

@@ -24,11 +24,7 @@ consistent on my BBC B too.
 
 This test suite may become more comprehensive over time.
 
-I've written it to be (hopefully) portable without too much work, but
-so far that's only a theory. Currently it is aimed at 8-bit Acorn
-systems only.
-
-# running the tests
+# running the tests on a BBC Micro
 
 1. Look in `releases` folder
 2. Use ssd file with newest date (Note if downloading from the GitHub
@@ -52,6 +48,84 @@ simulated state.
 
 The tests are not currently very automation-friendly, but this will
 improve. 
+
+# running the tests on some other system
+
+You can modify the source code as required, and build for the target
+of interest. Note how the TARGET variable is set in the Makefile and
+used by the code. The Acorn target would serve as an example.
+
+Alternatively, the generic version of the test can be runtime patched.
+Look in the `releases` folder and find the `6502-tests-generic` file
+with the most newest date. Load this at $2000 in RAM (it is
+self-modifying), and start execution by jumping to $2000.
+
+It uses its own data, zero page between $60 and $8f, and all of
+page 1. (It does not write to other areas.)
+
+At the start of the loaded code are a set of callbacks, called as the
+tests run. There's 8 bytes allocated for each, allowing space for a
+short snippet of code, or a JMP to somewhere else.
+
+The callbacks are:
+
+## $2003 - `start_callback`
+
+Called before the tests start. 
+
+## $200b - `test_begin_callback`
+
+Called when a test is about to be run. The address of the test's name,
+a 0-terminated ASCII string, is held in Y (MSB) and X (LSB).
+
+Return with carry set to run the test, or carry clear to skip it.
+
+Default callback does `sec:rts`.
+
+## $2013 - `test_fail_callback`
+
+Called when a test case fails. The address of the test state is held
+in Y (MSB) and X (LSB).
+
+The test state consists of 3 state structs: input state, output state
+(from having the 6502 do the test), and simulated state (from having
+the 6502 simulate the test). Each state struct is 6 bytes: A, X, Y, S,
+P and operand, 1 byte each.
+
+Return with carry set to have the test state printed, or carry clear
+to have it fail silently.
+
+Default callback does `sec:rts`.
+
+## $201b - `test_pass_callback`
+
+Called when a test passes.
+
+Default callback does `rts`.
+
+## $2023 - `test_end_callback`
+
+Called when a test finishes, pass or fail.
+
+Default callback does `rts`.
+
+## $202b - `finish_callback`
+
+Called when the tests are finished. The stack will have been
+overwritten so (if running on a real system) you may have to arrange
+for some kind of reset.
+
+Default callback does `jmp tests_end_callback`.
+
+## $2033 - `print_char`
+
+Print a single character. Control codes used are:
+
+ASCII 8 = non-destructive backspace
+ASCII 10 = line feed
+ASCII 13 = carriage return
+
+Default callback does `rts`.
 
 # what's tested
 

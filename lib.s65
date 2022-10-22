@@ -1,7 +1,3 @@
-                .section zp_lib
-print_ptr: .fill 2
-                .endsection zp_lib
-
 ;-------------------------------------------------------------------------
 
                 .section code_lib
@@ -11,67 +7,15 @@ print_ptr: .fill 2
 is_65c02: .proc
                 .cpu '65c02'
                 ldx #$ff
-                phx
+                phx             ;1-byte NOP on NMOS
                 inx
-                plx
+                plx             ;1-byte NOP on NMOS
                 .cpu 'default'
                 cpx #1
+                ; X=$00 on NMOS, X=$ff on CMOS
                 rts
                 .endproc
 
-;-------------------------------------------------------------------------
-
-print0: .proc
-                pla
-                sta print_ptr+0
-                pla
-                sta print_ptr+1
-
-loop:
-                ldx #print_ptr
-                jsr incz16
-                
-                lda #218        ;items in VDU queue (AUG p221)
-                jsr osbyte_x00_yff
-                
-                ldy #0
-                lda (print_ptr),y
-
-                cpx #0
-                bne print
-
-                cmp #0
-                beq done
-
-print:
-                jsr oswrch
-
-                
-                jmp loop
-
-done:
-                ldx #print_ptr
-                jsr incz16
-                jmp (print_ptr)
-                
-                .endproc   
-
-;-------------------------------------------------------------------------
-
-incz16:
-                inc 0,x
-                bne +
-                inc 1,x
-+
-                rts
-                
-;-------------------------------------------------------------------------
-
-osbyte_x00_yff:
-                ldx #$00
-                ldy #$ff
-                jmp osbyte
-                
 ;-------------------------------------------------------------------------
 
 get_hi_nybble_ascii:
@@ -92,10 +36,10 @@ print_hex:
                 pha
                 pha
                 jsr get_hi_nybble_ascii
-                jsr oswrch
+                jsr print_char
                 pla
                 jsr get_lo_nybble_ascii
-                jsr oswrch
+                jsr print_char
                 pla
                 rts
                 

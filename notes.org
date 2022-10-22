@@ -1,3 +1,30 @@
+* entry points
+
+** +0 = start tests
+
+You call this.
+
+** +3, 8 bytes = test begin callback
+
+Y/X = point to test name
+
+set C=1 to run test, C=0 to skip it
+
+** +11, 8 bytes = test case fail callback
+
+Y/X = point to 3 state structs: input state, output state, simulated
+state
+
+each struct is 6 bytes: a, x, y, s, p, operand
+
+set C=1 to print info
+
+** +19, 8 bytes = test pass callback
+
+test passed.
+
+* data collection times
+
 https://www.masswerk.at/nowgobang/2021/6502-illegal-opcodes
 
 Based on the ADC/SBC tests, at 2 MHz, using BeebLink, should take

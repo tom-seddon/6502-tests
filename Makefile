@@ -13,8 +13,10 @@ all:
 	$(SHELLCMD) mkdir "$(BUILD)"
 	$(SHELLCMD) mkdir "$(BEEB_BUILD)"
 
-	$(TASS) --case-sensitive --long-branch --m65xx --cbm-prg -L "$(BUILD)/6502-tests.lst" -o "$(BUILD)/6502-tests.prg" "6502-tests.s65"
+	$(TASS) --case-sensitive --long-branch --m65xx --cbm-prg -L "$(BUILD)/6502-tests.lst" -o "$(BUILD)/6502-tests.prg" "6502-tests.s65" -D TARGET=\"acorn\"
 	$(PYTHON3) submodules/beeb/bin/prg2bbc.py "$(BUILD)/6502-tests.prg" "$(BEEB_BUILD)/$$.TESTS"
+
+	$(TASS) --case-sensitive --long-branch --m65xx --nostart -L "$(BUILD)/6502-tests-generic.lst" -o "$(BUILD)/6502-tests-generic.dat" "6502-tests.s65" -D TARGET=\"generic\"
 
 	$(TASS) --case-sensitive --long-branch --m6502 --cbm-prg -L "$(BUILD)/6502-consistency-tests.lst" -o "$(BUILD)/6502-consistency-tests.prg" "6502-consistency-tests.s65"
 	$(PYTHON3) submodules/beeb/bin/prg2bbc.py "$(BUILD)/6502-consistency-tests.prg" "$(BEEB_BUILD)/M.CONS"
@@ -25,6 +27,7 @@ all:
 ##########################################################################
 
 .PHONY:clean
+clean:
 	$(SHELLCMD) rm-tree "$(BUILD)"
 	$(SHELLCMD) rm-tree "$(BEEB_BUILD)"
 
@@ -36,3 +39,4 @@ release: TIMESTAMP:=$(shell $(SHELLCMD) strftime -d _ _Y_m_dT_H_M_S)
 release: all
 	$(SHELLCMD) mkdir "$(RELEASE)"
 	$(SHELLCMD) copy-file "$(BUILD)/6502-tests.ssd" "$(RELEASE)/6502-tests.$(TIMESTAMP).ssd"
+	$(SHELLCMD) copy-file "$(BUILD)/6502-tests-generic.dat" "$(RELEASE)/6502-tests-generic.$(TIMESTAMP).dat"

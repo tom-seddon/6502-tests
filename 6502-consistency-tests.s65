@@ -1,6 +1,8 @@
                 .include "./submodules/beeb/include/beeb.s65"
                 .include "lib.s65"
 
+print_char=oswrch
+                
 ;-------------------------------------------------------------------------
 
 ; as far is I can tell, BBC BASIC doesn't actually use zp past $4f. So
@@ -182,8 +184,12 @@ test_list..=[(exec_ane_o00,cycle_A_X,"ane #$00")]
 ;-------------------------------------------------------------------------
 
 exec_lax_imm: .proc
-                ldx input_operand
-                stx l+1
+                pha
+                lda operand
+                sta l+1
+                pla
+                ;ldx operand
+                ; stx l+1
 l: lax #$ff
                 jmp exec_done
                 .endproc
@@ -201,6 +207,8 @@ cycle_operand_A:
                 bne loop
                 jmp exit
 
+                
+                
 test_list..=[(exec_lax_imm,cycle_operand_A,"lax #$nn")]
 
 cycle_A:
@@ -208,14 +216,25 @@ cycle_A:
                 bne loop
                 jmp exit
 
-exec_lax_ns: .bfor i=0,i<8,i+=1
-value=255>>i
-                lax #value
+exec_lax_2: .proc
+                lda #0
+                ldx #$ff
+                lax #$ff
+                jmp exec_done
+                .endproc
+
+test_list..=[(exec_lax_2,cycle_A,"lax #$ff (A=$00 X=$ff)")]
+
+                
+exec_lax_3s: .bfor i=0,i<8,i+=1
+                lda #0
+                ldx #$ff
+                lax #1<<i
                 jmp exec_done
                 .endfor
 
-                .for i=0,i<len(exec_lax_ns),i+=1
-test_list..=[(exec_lax_ns[i],cycle_A,"lax #$xx ("..format("%d",i)..")")]
+                .for i=0,i<len(exec_lax_3s),i+=1
+test_list..=[(exec_lax_3s[i],cycle_A,"lax #$"..format("%02x",1<<i))]
                 .endfor
 
 ;-------------------------------------------------------------------------
